@@ -2,11 +2,15 @@ package com.zzd.tool.hook
 
 import android.util.Log
 import android.widget.TextView
+import com.zzd.tool.hook.core.DexResolver
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XC_MethodReplacement
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 class HookEntry : IXposedHookLoadPackage {
@@ -14,13 +18,11 @@ class HookEntry : IXposedHookLoadPackage {
     companion object {
         private const val TAG = "ZddTool"
         private const val TARGET = "com.alibaba.taurus.zhejiang"
-
-        // AIMMsgRecallType 常量（来自 smali 逆向）
         private const val RECALL_TYPE_GROUP_OWNER = 2
         private const val RECALL_TYPE_ADMIN = 5
-
-        // msgId → recallType 映射（有上限防泄漏）
         private const val RECALL_MAP_MAX = 5000
+        private const val BADGE_TAG = "zdd_badge"
+
         private val recalledMsgs = object : ConcurrentHashMap<Long, Int>() {
             override fun put(key: Long, value: Int): Int? {
                 if (size >= RECALL_MAP_MAX) {
@@ -31,10 +33,6 @@ class HookEntry : IXposedHookLoadPackage {
             }
         }
 
-        // View tag，用于标记/查找我们自己添加的 badge TextView
-        private const val BADGE_TAG = "zdd_badge"
-
-        // 资源 ID 缓存（动态获取，避免硬编码）
         private val resIdCache = HashMap<String, Int>()
         private fun resId(view: android.view.View, name: String): Int {
             return resIdCache.getOrPut(name) {
@@ -48,30 +46,42 @@ class HookEntry : IXposedHookLoadPackage {
         val cl = lpparam.classLoader
         Log.i(TAG, "浙政钉已加载")
 
+        DexResolver.init(lpparam.appInfo.sourceDir, cl,
+            cacheDir = "${lpparam.appInfo.dataDir}/files")
+
         hookTablet(cl)
-        hookRecallDetect(cl)
-        hookShieldStatus(cl)
+        hookRecall(cl)
+        hookShield(cl)
         hookForward(cl)
         hookViewHolder(cl)
 
+        DexResolver.release()
         Log.i(TAG, "全部Hook完成")
     }
 
-    // ── 平板模式 ──
+    // ══════════════════════════════════════════════
+    // 1. 平板模式
+    // ══════════════════════════════════════════════
     private fun hookTablet(cl: ClassLoader) {
         try {
-            XposedHelpers.findAndHookMethod(
-                "com.alibaba.dinggov.util.DeviceUtil",
-                cl, "a", android.content.Context::class.java,
+            val target = DexResolver.findClassByStrings("config_deviceInfo")
+                ?: XposedHelpers.findClass("com.alibaba.dinggov.util.DeviceUtil", cl)
+            XposedHelpers.findAndHookMethod(target, "a",
+                android.content.Context::class.java,
                 object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) { param.result = true }
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        param.result = true
+                    }
                 })
             Log.i(TAG, "✔ 平板")
         } catch (t: Throwable) { Log.e(TAG, "✘ 平板", t) }
     }
 
-    // ── recallStatus → 检测撤回 + 返回 0 ──
-    private fun hookRecallDetect(cl: ClassLoader) {
+    // ══════════════════════════════════════════════
+    // 2. 撤回检测 — recallStatus
+    //    MessageDelegate 是 SDK 类，不混淆，直接硬编码
+    // ══════════════════════════════════════════════
+    private fun hookRecall(cl: ClassLoader) {
         try {
             XposedHelpers.findAndHookMethod(
                 "com.alibaba.wukong.im.adapter.MessageDelegate",
@@ -79,25 +89,29 @@ class HookEntry : IXposedHookLoadPackage {
                 object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         try {
-                            val aimMsg = XposedHelpers.getObjectField(param.thisObject, "mAIMMessage")
+                            val aimMsg = XposedHelpers.getObjectField(
+                                param.thisObject, "mAIMMessage")
                             if (XposedHelpers.getBooleanField(aimMsg, "isRecall")) {
                                 val msgId = XposedHelpers.callMethod(
                                     param.thisObject, "messageId"
                                 ) as? Long ?: return@beforeHookedMethod
                                 if (recalledMsgs.putIfAbsent(msgId, 0) == null) {
-                                    Log.i(TAG, "📌 检测到撤回 msgId=$msgId")
+                                    Log.i(TAG, "📌 撤回 msgId=$msgId")
                                 }
                             }
                         } catch (_: Exception) {}
                         param.result = 0
                     }
                 })
-            Log.i(TAG, "✔ 检测")
-        } catch (t: Throwable) { Log.e(TAG, "✘ 检测", t) }
+            Log.i(TAG, "✔ recallStatus")
+        } catch (t: Throwable) { Log.e(TAG, "✘ recallStatus", t) }
     }
 
-    // ── shieldStatus → 返回 0 + 读取真实 recallType ──
-    private fun hookShieldStatus(cl: ClassLoader) {
+    // ══════════════════════════════════════════════
+    // 3. shield 处理 — shieldStatus
+    //    MessageDelegate 是 SDK 类不混淆，直接用硬编码名
+    // ══════════════════════════════════════════════
+    private fun hookShield(cl: ClassLoader) {
         try {
             XposedHelpers.findAndHookMethod(
                 "com.alibaba.wukong.im.adapter.MessageDelegate",
@@ -105,7 +119,8 @@ class HookEntry : IXposedHookLoadPackage {
                 object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         try {
-                            val aimMsg = XposedHelpers.getObjectField(param.thisObject, "mAIMMessage")
+                            val aimMsg = XposedHelpers.getObjectField(
+                                param.thisObject, "mAIMMessage")
                             if (XposedHelpers.getBooleanField(aimMsg, "isRecall")) {
                                 val msgId = XposedHelpers.callMethod(
                                     param.thisObject, "messageId"
@@ -120,115 +135,124 @@ class HookEntry : IXposedHookLoadPackage {
                         param.result = 0
                     }
                 })
-            Log.i(TAG, "✔ shield")
+            Log.i(TAG, "✔ shieldStatus")
         } catch (t: Throwable) { Log.e(TAG, "✘ shield", t) }
     }
 
-    // ── 解除转发限制 ──
+    // ══════════════════════════════════════════════
+    // 4. 解除转发限制
+    // ══════════════════════════════════════════════
     private fun hookForward(cl: ClassLoader) {
         try {
             val msgClass = XposedHelpers.findClass("com.alibaba.wukong.im.Message", cl)
             val convClass = XposedHelpers.findClass("com.alibaba.wukong.im.Conversation", cl)
 
-            // ckv.i(Message) → 单独转发权限（语音能单独转发靠这个）
-            XposedHelpers.findAndHookMethod(
-                "taurus.ckv", cl, "i", msgClass,
-                XC_MethodReplacement.returnConstant(true)
-            )
-
-            // cxb.b(Conversation, Collection) → 批量转发过滤入口
-            // 跳过所有过滤逻辑，直接调用 a(Conversation, List) 执行转发
-            XposedHelpers.findAndHookMethod(
-                "taurus.cxb", cl, "b", convClass, java.util.Collection::class.java,
-                object : XC_MethodReplacement() {
-                    override fun replaceHookedMethod(param: MethodHookParam): Any? {
-                        val conv = param.args[0]
-                        val msgs = param.args[1]
-                        val list = java.util.ArrayList<Any?>()
-                        if (msgs is java.util.Collection<*>) list.addAll(msgs) else return null
-                        XposedHelpers.callMethod(param.thisObject, "a", conv, list)
-                        return null
+            // ── 单独转发：ckx.i(Message)Z ──
+            // 用 返回值(boolean)+参数(Message)+数值(0x642) 三重定位，唯一标识此方法
+            var methodName = DexResolver.findMethodNameBySignature(
+                "boolean", arrayOf("com.alibaba.wukong.im.Message"), 0x642)
+            if (methodName == null) {
+                // fallback: 试 "i"（两版 APK 都没变）
+                methodName = "i"
+            }
+            try {
+                XposedHelpers.findAndHookMethod("taurus.ckx", cl, methodName, msgClass,
+                    XC_MethodReplacement.returnConstant(true))
+                Log.i(TAG, "✔ ckx.$methodName")
+            } catch (_: NoSuchMethodError) {
+                // 方法名可能变了 → fallback: 搜签名 (Message)→boolean
+                val ckxClass = XposedHelpers.findClass("taurus.ckx", cl)
+                for (m in ckxClass.declaredMethods) {
+                    if (m.returnType == java.lang.Boolean.TYPE && m.parameterTypes.size == 1
+                        && m.parameterTypes[0] == msgClass) {
+                        try {
+                            XposedHelpers.findAndHookMethod(ckxClass, m.name, msgClass,
+                                XC_MethodReplacement.returnConstant(true))
+                            Log.i(TAG, "✔ ckx.${m.name}")
+                            break
+                        } catch (_: Throwable) {}
                     }
-                })
+                }
+            }
+
+            // ── 批量转发：cxb.b() ──
+            try {
+                val cxbNames = listOf("taurus.cxb", "taurus.cww", "taurus.cwy")
+                var cxbClass: Class<*>? = null
+                for (name in cxbNames) {
+                    try { cxbClass = XposedHelpers.findClass(name, cl); break }
+                    catch (_: Throwable) {}
+                }
+                if (cxbClass != null) {
+                    XposedHelpers.findAndHookMethod(cxbClass, "b", convClass,
+                        java.util.Collection::class.java,
+                        object : XC_MethodReplacement() {
+                            override fun replaceHookedMethod(param: MethodHookParam): Any? {
+                                val conv = param.args[0]
+                                val list = java.util.ArrayList<Any?>()
+                                (param.args[1] as? java.util.Collection<*>)?.let {
+                                    list.addAll(it)
+                                } ?: return null
+                                XposedHelpers.callMethod(param.thisObject, "a", conv, list)
+                                return null
+                            }
+                        })
+                }
+            } catch (_: Throwable) {}
 
             Log.i(TAG, "✔ 转发")
         } catch (t: Throwable) { Log.e(TAG, "✘ 转发", t) }
     }
 
-    // ── 读取 recallFeature.operatorType → int ──
-    private fun readRecallType(aimMsg: Any): Int {
-        return try {
-            val recallFeature = XposedHelpers.getObjectField(aimMsg, "recallFeature")
-            val operatorType = XposedHelpers.getObjectField(recallFeature, "operatorType")
-            XposedHelpers.callMethod(operatorType, "getValue") as Int
-        } catch (_: Exception) { 0 }
-    }
-
-    // ── 格式化消息时间（带秒）──
-    private fun formatTime(msg: Any): String {
-        return try {
-            val ts = XposedHelpers.callMethod(msg, "createdAt") as? Long ?: return ""
-            val sdf = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
-            sdf.format(java.util.Date(ts))
-        } catch (_: Exception) { "" }
-    }
-
-    // ── 根据 recallType 返回 badge 文案 ──
-    private fun recallBadge(recallType: Int): String {
-        return if (recallType == RECALL_TYPE_ADMIN || recallType == RECALL_TYPE_GROUP_OWNER) {
-            "⤴管理员已撤回"
-        } else {
-            "⤴已撤回"
-        }
-    }
-
-    // ── getView hook：在消息右下角显示撤回标记 / 发送时间 ──
+    // ══════════════════════════════════════════════
+    // 5. 右下角 badge / 时间
+    // ══════════════════════════════════════════════
     private fun hookViewHolder(cl: ClassLoader) {
         try {
-            XposedHelpers.findAndHookMethod(
-                "taurus.awv", cl, "getView",
-                Integer.TYPE, android.view.View::class.java, android.view.ViewGroup::class.java,
+            val target = DexResolver.findClassByStrings("getItemViewType position: ")
+                ?: findClassByFallback(cl, "taurus.awv") ?: run {
+                Log.e(TAG, "✘ viewHolder: 找不到类")
+                return
+            }
+            XposedHelpers.findAndHookMethod(target, "getView",
+                Integer.TYPE, android.view.View::class.java,
+                android.view.ViewGroup::class.java,
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         try {
                             val rootView = param.result as? android.view.View ?: return
-                            val position = param.args[0] as Int
-
+                            val position = (param.args[0] as? Int) ?: return
                             val message = XposedHelpers.callMethod(
                                 param.thisObject, "b", position
                             ) as? Any ?: return
-                            val msgId = XposedHelpers.callMethod(message, "messageId") as? Long ?: return
+                            val msgId = XposedHelpers.callMethod(message, "messageId"
+                            ) as? Long ?: return
                             val recallType = recalledMsgs[msgId]
-                            val displayText = if (recallType != null) recallBadge(recallType) else formatTime(message)
-
-                            // 方案1: 自己消息 → 已读计数区域
-                            val selfView = rootView.findViewById<android.widget.TextView>(
-                                resId(rootView, "chatting_unreadcount_tv1")
-                            )
+                            val displayText = if (recallType != null) {
+                                recallBadge(recallType)
+                            } else {
+                                formatTime(message)
+                            }
+                            val selfView = rootView.findViewById<TextView>(
+                                resId(rootView, "chatting_unreadcount_tv1"))
                             if (selfView != null) {
                                 if (recallType != null) {
                                     selfView.visibility = android.view.View.VISIBLE
                                     selfView.text = displayText
                                 }
-                                // 未撤回：不动，让 app 正常显示已读计数
                                 return
                             }
-
-                            // 方案2: 别人消息 → rl_tips 容器
                             val rlTips = rootView.findViewById<android.view.ViewGroup>(
-                                resId(rootView, "rl_tips")
-                            )
+                                resId(rootView, "rl_tips"))
                             if (rlTips != null) {
-                                val oldBadge = rlTips.findViewWithTag<android.widget.TextView>(BADGE_TAG)
+                                val oldBadge = rlTips.findViewWithTag<TextView>(BADGE_TAG)
                                 if (oldBadge != null) {
                                     oldBadge.text = displayText
                                 } else {
-                                    val badgeView = android.widget.TextView(rootView.context).apply {
-                                        text = displayText
-                                        textSize = 11f
+                                    val badgeView = TextView(rootView.context).apply {
+                                        text = displayText; textSize = 11f
                                         setTextColor(0xFF999999.toInt())
-                                        includeFontPadding = false
-                                        tag = BADGE_TAG
+                                        includeFontPadding = false; tag = BADGE_TAG
                                     }
                                     val lp = android.widget.RelativeLayout.LayoutParams(
                                         android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -240,12 +264,10 @@ class HookEntry : IXposedHookLoadPackage {
                                 }
                                 return
                             }
-
-                            // 方案3: 兜底
-                            val fallbackTv = findFirstTextView(rootView)
-                            if (fallbackTv != null && recallType != null) {
-                                fallbackTv.text = "${fallbackTv.text}\n$displayText"
-                                fallbackTv.setTextColor(0xFFE53935.toInt())
+                            val fallback = findFirstTextView(rootView)
+                            if (fallback != null && recallType != null) {
+                                fallback.text = "${fallback.text}\n$displayText"
+                                fallback.setTextColor(0xFFE53935.toInt())
                             }
                         } catch (_: Exception) {}
                     }
@@ -253,6 +275,31 @@ class HookEntry : IXposedHookLoadPackage {
             Log.i(TAG, "✔ viewHolder")
         } catch (t: Throwable) { Log.e(TAG, "✘ viewHolder", t) }
     }
+
+    // ══════════════════════════════════════════════
+    // 工具方法
+    // ══════════════════════════════════════════════
+
+    private fun findClassByFallback(cl: ClassLoader, vararg names: String): Class<*>? {
+        for (n in names) {
+            try { return XposedHelpers.findClass(n, cl) } catch (_: Throwable) {}
+        }
+        return null
+    }
+
+    private fun readRecallType(aimMsg: Any): Int = try {
+        val rf = XposedHelpers.getObjectField(aimMsg, "recallFeature")
+        val ot = XposedHelpers.getObjectField(rf, "operatorType")
+        XposedHelpers.callMethod(ot, "getValue") as Int
+    } catch (_: Exception) { 0 }
+
+    private fun recallBadge(type: Int) = if (type == RECALL_TYPE_ADMIN || type == RECALL_TYPE_GROUP_OWNER)
+        "⤴管理员已撤回" else "⤴已撤回"
+
+    private fun formatTime(msg: Any): String = try {
+        val ts = XposedHelpers.callMethod(msg, "createdAt") as? Long ?: return ""
+        SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(ts))
+    } catch (_: Exception) { "" }
 
     private fun findFirstTextView(view: android.view.View): TextView? {
         if (view is TextView) return view

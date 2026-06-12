@@ -40,8 +40,11 @@ android {
 }
 
 dependencies {
-    // Xposed API
+    // Xposed API (compileOnly，运行时由 LSPosed 提供)
     compileOnly("de.robv.android.xposed:api:82")
+
+    // DexKit — 运行时搜索混淆后的类/方法
+    implementation("org.luckypray:dexkit:2.2.0")
 
     // AndroidX
     implementation("androidx.core:core-ktx:1.13.1")
