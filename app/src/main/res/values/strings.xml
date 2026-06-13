@@ -5,4 +5,14 @@
     <string name="module_version">Module version: %1$s</string>
     <string name="module_not_activated">Module not activated</string>
     <string name="module_is_activated">Module is activated</string>
+    <string name="title_features">功能开关</string>
+    <string name="title_cache">缓存设置</string>
+    <string name="feature_tablet">平板模式</string>
+    <string name="feature_recall">消息防撤回</string>
+    <string name="feature_forward">解除转发限制</string>
+    <string name="feature_badge">右下角信息</string>
+    <string name="feature_cache">启用 DexKit 缓存</string>
+    <string name="btn_clear_cache">清除缓存</string>
+    <string name="cache_cleared">缓存已清除</string>
+    <string name="cache_clear_failed">清除失败</string>
 </resources>

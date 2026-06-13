@@ -2,6 +2,7 @@ package com.zzd.tool.hook
 
 import android.util.Log
 import android.widget.TextView
+import com.zzd.tool.config.SettingsManager
 import com.zzd.tool.hook.core.DexResolver
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
@@ -46,14 +47,27 @@ class HookEntry : IXposedHookLoadPackage {
         val cl = lpparam.classLoader
         Log.i(TAG, "浙政钉已加载")
 
+        val settingsAvailable = try {
+            val app = XposedHelpers.callStaticMethod(
+                XposedHelpers.findClass("android.app.ActivityThread", null),
+                "currentApplication"
+            ) as? android.app.Application
+            if (app != null) SettingsManager.initHooks(app) else false
+        } catch (e: Throwable) {
+            Log.w(TAG, "Cannot get context, all features enabled")
+            false
+        }
+
         DexResolver.init(lpparam.appInfo.sourceDir, cl,
             cacheDir = "${lpparam.appInfo.dataDir}/files")
 
-        hookTablet(cl)
-        hookRecall(cl)
-        hookShield(cl)
-        hookForward(cl)
-        hookViewHolder(cl)
+        if (!settingsAvailable || SettingsManager.isTabletEnabled()) hookTablet(cl)
+        if (!settingsAvailable || SettingsManager.isRecallEnabled()) {
+            hookRecall(cl)
+            hookShield(cl)
+        }
+        if (!settingsAvailable || SettingsManager.isForwardEnabled()) hookForward(cl)
+        if (!settingsAvailable || SettingsManager.isBadgeEnabled()) hookViewHolder(cl)
 
         DexResolver.release()
         Log.i(TAG, "全部Hook完成")
