@@ -1,7 +1,6 @@
 package com.zzd.tool.hook.core
 
 import android.util.Log
-import com.zzd.tool.config.SettingsManager
 import de.robv.android.xposed.XposedHelpers
 import org.json.JSONObject
 import org.luckypray.dexkit.DexKitBridge
@@ -154,10 +153,6 @@ object DexResolver {
     }
 
     private fun loadCache(): Boolean {
-        if (!SettingsManager.isCacheEnabled()) {
-            Log.i(TAG, "DexResolver: cache disabled by settings")
-            return false
-        }
         val file = cacheFile() ?: return false
         if (!file.exists()) return false
         return try {
@@ -182,10 +177,6 @@ object DexResolver {
     }
 
     private fun saveCache() {
-        if (!SettingsManager.isCacheEnabled()) {
-            Log.i(TAG, "DexResolver: cache save skipped (disabled by settings)")
-            return
-        }
         if (classNameCache.isEmpty()) return
         val file = cacheFile() ?: return
         try {
