@@ -127,24 +127,6 @@ object DexResolver {
         } catch (e: Exception) { null }
     }
 
-    /** 通过返回值+参数类型+数值常量精确定位方法名 */
-    fun findMethodNameBySignature(returnType: String, paramTypes: Array<String>, vararg numbers: Number): String? {
-        val key = "msig:$returnType(${paramTypes.joinToString(",")})#${numbers.joinToString(",")}"
-        val b = bridge ?: return null
-        return try {
-            b.findMethod {
-                searchPackages("taurus")
-                matcher {
-                    this.returnType = returnType
-                    this.paramTypes(*paramTypes)
-                    if (numbers.isNotEmpty()) usingNumbers(*numbers)
-                }
-            }.firstOrNull()?.name?.also { name ->
-                Log.i(TAG, "✔ method $key → $name")
-            }
-        } catch (e: Exception) { null }
-    }
-
     // ── 缓存 ──
 
     private fun cacheFile(): File? {

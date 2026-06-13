@@ -1,17 +1,21 @@
 <resources>
-    <string name="app_name">浙政钉工具</string>
-    <string name="xposed_desc">浙政钉辅助：平板登录 + 防撤回</string>
-    <string name="about_module">Based on DexKit + Xposed Framework.\nSource: github.com/your/zzdtool</string>
+    <string name="app_name">ZZD Tool</string>
+    <string name="xposed_desc">ZheZhengDing Auxiliary</string>
+    <string name="about_module">Based on DexKit + Xposed Framework\nScope: ZZD (com.alibaba.taurus.zhejiang)</string>
     <string name="module_version">Module version: %1$s</string>
+    <string name="module_subtitle">ZZD Tool\nTablet login + Anti-recall</string>
     <string name="module_not_activated">Module not activated</string>
     <string name="module_is_activated">Module is activated</string>
-    <string name="title_features">功能开关</string>
-    <string name="title_cache">缓存设置</string>
-    <string name="feature_tablet">平板模式</string>
-    <string name="feature_recall">消息防撤回</string>
-    <string name="feature_forward">解除转发限制</string>
-    <string name="feature_badge">右下角信息</string>
-    <string name="btn_clear_cache">清除缓存</string>
-    <string name="cache_cleared">缓存已清除</string>
-    <string name="cache_clear_failed">清除失败</string>
+    <string name="title_features">Feature Switches</string>
+    <string name="title_cache">Cache Settings</string>
+    <string name="feature_tablet">Tablet Mode</string>
+    <string name="feature_recall">Anti-Recall</string>
+    <string name="feature_forward">Forward Unlock</string>
+    <string name="feature_badge">Message Info Badge</string>
+    <string name="btn_clear_cache">Clear Cache</string>
+    <string name="btn_reset_settings">Reset All Settings</string>
+    <string name="cache_cleared">Cache cleared</string>
+    <string name="cache_clear_failed">Clear failed</string>
+    <string name="settings_reset">Settings reset to defaults</string>
+    <string name="settings_reset_failed">Reset failed</string>
 </resources>

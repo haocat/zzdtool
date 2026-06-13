@@ -6,7 +6,6 @@ import com.zzd.tool.config.SettingsManager
 import com.zzd.tool.hook.core.DexResolver
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XC_MethodReplacement
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.text.SimpleDateFormat
@@ -45,18 +44,18 @@ class HookEntry : IXposedHookLoadPackage {
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         if (lpparam.packageName != TARGET) return
         val cl = lpparam.classLoader
-        Log.i(TAG, "浙政钉已加载")
+        Log.i(TAG, "ZZD已加载")
 
-        // Application.onCreate 时才有 Context → 延迟初始化 SettingsManager
+        // 延迟初始化：Application.onCreate 后才有可用的 Context
         try {
             val appClass = XposedHelpers.findClass("android.app.Application", null)
             XposedHelpers.findAndHookMethod(appClass, "onCreate",
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        try {
-                            val app = param.thisObject as android.app.Application
-                            SettingsManager.initHooks(app)
-                        } catch (_: Throwable) {}
+                        val app = param.thisObject as? android.app.Application ?: return
+                        if (!SettingsManager.initHooks(app)) {
+                            Log.w(TAG, "开关: 读取失败，所有功能默认启用")
+                        }
                     }
                 })
         } catch (_: Throwable) {}
@@ -77,11 +76,11 @@ class HookEntry : IXposedHookLoadPackage {
 
     // ══════════════════════════════════════════════
     // 1. 平板模式
+    //    DeviceUtil 在 com.alibaba.dinggov.util 包，不在 taurus 包内，直接硬编码
     // ══════════════════════════════════════════════
     private fun hookTablet(cl: ClassLoader) {
         try {
-            val target = DexResolver.findClassByStrings("config_deviceInfo")
-                ?: XposedHelpers.findClass("com.alibaba.dinggov.util.DeviceUtil", cl)
+            val target = XposedHelpers.findClass("com.alibaba.dinggov.util.DeviceUtil", cl)
             XposedHelpers.findAndHookMethod(target, "a",
                 android.content.Context::class.java,
                 object : XC_MethodHook() {
@@ -164,65 +163,49 @@ class HookEntry : IXposedHookLoadPackage {
     private fun hookForward(cl: ClassLoader) {
         try {
             val msgClass = XposedHelpers.findClass("com.alibaba.wukong.im.Message", cl)
-            val convClass = XposedHelpers.findClass("com.alibaba.wukong.im.Conversation", cl)
 
-            // ── 单独转发：ckx.i(Message)Z ──
-            // 用 返回值(boolean)+参数(Message)+数值(0x642) 三重定位，唯一标识此方法
-            var methodName = DexResolver.findMethodNameBySignature(
-                "boolean", arrayOf("com.alibaba.wukong.im.Message"), 0x642)
-            if (methodName == null) {
-                // fallback: 试 "i"（两版 APK 都没变）
-                methodName = "i"
+            // DexKit 按特征字符串自动定位转发过滤类（ckx/ckv/...）
+            val forwardClass = DexResolver.findClassByStrings("isForwardMsg", "supportForward")
+            if (forwardClass == null) {
+                Log.e(TAG, "✘ 转发: DexKit 找不到含 isForwardMsg 的类")
+                return
             }
+            Log.i(TAG, "✔ 转发类: ${forwardClass.name}")
+
+            // 在该类中找 i(Message)→boolean 方法
+            var targetMethod: java.lang.reflect.Method? = null
+            for (m in forwardClass.declaredMethods) {
+                if (m.returnType == java.lang.Boolean.TYPE && m.parameterTypes.size == 1
+                    && m.parameterTypes[0] == msgClass && m.name == "i") {
+                    targetMethod = m
+                    break
+                }
+            }
+            // fallback: 找任意 (Message)→boolean + 0x642 数值的方法
+            if (targetMethod == null) {
+                for (m in forwardClass.declaredMethods) {
+                    if (m.returnType == java.lang.Boolean.TYPE && m.parameterTypes.size == 1
+                        && m.parameterTypes[0] == msgClass) {
+                        targetMethod = m
+                        Log.i(TAG, "✔ 转发fallback: ${forwardClass.name}.${m.name}")
+                        break
+                    }
+                }
+            }
+
             val forwardHook = object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     if (!SettingsManager.isForwardEnabled()) return
                     param.result = true
                 }
             }
-            try {
-                XposedHelpers.findAndHookMethod("taurus.ckx", cl, methodName, msgClass,
-                    forwardHook)
-                Log.i(TAG, "✔ ckx.$methodName")
-            } catch (_: NoSuchMethodError) {
-                // 方法名可能变了 → fallback: 搜签名 (Message)→boolean
-                val ckxClass = XposedHelpers.findClass("taurus.ckx", cl)
-                for (m in ckxClass.declaredMethods) {
-                    if (m.returnType == java.lang.Boolean.TYPE && m.parameterTypes.size == 1
-                        && m.parameterTypes[0] == msgClass) {
-                        try {
-                            XposedHelpers.findAndHookMethod(ckxClass, m.name, msgClass, forwardHook)
-                            Log.i(TAG, "✔ ckx.${m.name}")
-                            break
-                        } catch (_: Throwable) {}
-                    }
-                }
-            }
 
-            // ── 批量转发：cxb.b() ──
-            try {
-                val cxbNames = listOf("taurus.cxb", "taurus.cww", "taurus.cwy")
-                var cxbClass: Class<*>? = null
-                for (name in cxbNames) {
-                    try { cxbClass = XposedHelpers.findClass(name, cl); break }
-                    catch (_: Throwable) {}
-                }
-                if (cxbClass != null) {
-                    XposedHelpers.findAndHookMethod(cxbClass, "b", convClass,
-                        java.util.Collection::class.java,
-                        object : XC_MethodReplacement() {
-                            override fun replaceHookedMethod(param: MethodHookParam): Any? {
-                                val conv = param.args[0]
-                                val list = java.util.ArrayList<Any?>()
-                                (param.args[1] as? java.util.Collection<*>)?.let {
-                                    list.addAll(it)
-                                } ?: return null
-                                XposedHelpers.callMethod(param.thisObject, "a", conv, list)
-                                return null
-                            }
-                        })
-                }
-            } catch (_: Throwable) {}
+            if (targetMethod != null) {
+                XposedHelpers.findAndHookMethod(forwardClass, targetMethod.name, msgClass, forwardHook)
+                Log.i(TAG, "✔ ${forwardClass.name}.${targetMethod.name}")
+            } else {
+                Log.e(TAG, "✘ 转发: 找不到 (Message)→boolean 方法")
+            }
 
             Log.i(TAG, "✔ 转发")
         } catch (t: Throwable) { Log.e(TAG, "✘ 转发", t) }

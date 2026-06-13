@@ -13,6 +13,11 @@ import com.zzd.tool.config.SettingsManager
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var switchTablet: SwitchCompat
+    private lateinit var switchRecall: SwitchCompat
+    private lateinit var switchForward: SwitchCompat
+    private lateinit var switchBadge: SwitchCompat
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -21,14 +26,46 @@ class MainActivity : AppCompatActivity() {
         val tvVersion = findViewById<TextView>(R.id.main_text_version)
 
         tvVersion.text = getString(R.string.module_version, BuildConfig.VERSION_NAME)
-        tvStatus.text = "浙政钉工具\n平板登录 + 防撤回"
+        tvStatus.text = getString(R.string.module_subtitle)
 
+        switchTablet = findViewById(R.id.switch_tablet_toggle)
+        switchRecall = findViewById(R.id.switch_recall_toggle)
+        switchForward = findViewById(R.id.switch_forward_toggle)
+        switchBadge = findViewById(R.id.switch_badge_toggle)
+
+        loadAndBindSwitches()
+
+        findViewById<TextView>(R.id.btn_clear_cache).setOnClickListener {
+            try {
+                SettingsManager.clearDexKitCache(this)
+                Toast.makeText(this, R.string.cache_cleared, Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, R.string.cache_clear_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        findViewById<TextView>(R.id.btn_reset_settings).setOnClickListener {
+            try {
+                SettingsManager.resetSettings(this)
+                // 先移除监听器，避免写回旧值
+                switchTablet.setOnCheckedChangeListener(null)
+                switchRecall.setOnCheckedChangeListener(null)
+                switchForward.setOnCheckedChangeListener(null)
+                switchBadge.setOnCheckedChangeListener(null)
+                // 复位开关到默认值
+                switchTablet.isChecked = true
+                switchRecall.isChecked = true
+                switchForward.isChecked = true
+                switchBadge.isChecked = true
+                Toast.makeText(this, R.string.settings_reset, Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, R.string.settings_reset_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun loadAndBindSwitches() {
         val settings = SettingsManager.loadSettings(this)
-
-        val switchTablet = findViewById<SwitchCompat>(R.id.switch_tablet_toggle)
-        val switchRecall = findViewById<SwitchCompat>(R.id.switch_recall_toggle)
-        val switchForward = findViewById<SwitchCompat>(R.id.switch_forward_toggle)
-        val switchBadge = findViewById<SwitchCompat>(R.id.switch_badge_toggle)
         switchTablet.isChecked = settings.optBoolean("hook_tablet", true)
         switchRecall.isChecked = settings.optBoolean("hook_recall", true)
         switchForward.isChecked = settings.optBoolean("hook_forward", true)
@@ -45,15 +82,6 @@ class MainActivity : AppCompatActivity() {
         }
         switchBadge.setOnCheckedChangeListener { _, isChecked ->
             SettingsManager.saveSetting(this, "hook_badge", isChecked)
-        }
-
-        findViewById<TextView>(R.id.btn_clear_cache).setOnClickListener {
-            try {
-                SettingsManager.clearDexKitCache(this)
-                Toast.makeText(this, R.string.cache_cleared, Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                Toast.makeText(this, R.string.cache_clear_failed, Toast.LENGTH_SHORT).show()
-            }
         }
     }
 }

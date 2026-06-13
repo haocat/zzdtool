@@ -279,6 +279,21 @@
                     android:text="@string/btn_clear_cache"
                     android:textColor="#FF5252"
                     android:textSize="15sp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/colorThemeBackground" />
+
+                <TextView
+                    android:id="@+id/btn_reset_settings"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:paddingVertical="12dp"
+                    android:text="@string/btn_reset_settings"
+                    android:textColor="#FF9800"
+                    android:textSize="15sp" />
             </LinearLayout>
 
             <LinearLayout
