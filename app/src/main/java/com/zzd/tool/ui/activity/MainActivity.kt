@@ -29,13 +29,10 @@ class MainActivity : AppCompatActivity() {
         val switchRecall = findViewById<SwitchCompat>(R.id.switch_recall_toggle)
         val switchForward = findViewById<SwitchCompat>(R.id.switch_forward_toggle)
         val switchBadge = findViewById<SwitchCompat>(R.id.switch_badge_toggle)
-        val switchCache = findViewById<SwitchCompat>(R.id.switch_cache_toggle)
-
         switchTablet.isChecked = settings.optBoolean("hook_tablet", true)
         switchRecall.isChecked = settings.optBoolean("hook_recall", true)
         switchForward.isChecked = settings.optBoolean("hook_forward", true)
         switchBadge.isChecked = settings.optBoolean("hook_badge", true)
-        switchCache.isChecked = settings.optBoolean("dexkit_cache", true)
 
         switchTablet.setOnCheckedChangeListener { _, isChecked ->
             SettingsManager.saveSetting(this, "hook_tablet", isChecked)
@@ -48,9 +45,6 @@ class MainActivity : AppCompatActivity() {
         }
         switchBadge.setOnCheckedChangeListener { _, isChecked ->
             SettingsManager.saveSetting(this, "hook_badge", isChecked)
-        }
-        switchCache.setOnCheckedChangeListener { _, isChecked ->
-            SettingsManager.saveSetting(this, "dexkit_cache", isChecked)
         }
 
         findViewById<TextView>(R.id.btn_clear_cache).setOnClickListener {

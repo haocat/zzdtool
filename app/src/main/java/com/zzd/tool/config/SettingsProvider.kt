@@ -18,7 +18,6 @@ class SettingsProvider : ContentProvider() {
             put("hook_recall", true)
             put("hook_forward", true)
             put("hook_badge", true)
-            put("dexkit_cache", true)
         }
     }
 

@@ -270,35 +270,7 @@
                     android:textSize="14sp"
                     android:textStyle="bold" />
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingVertical="8dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/feature_cache"
-                        android:textColor="@color/colorTextGray"
-                        android:textSize="15sp" />
-
-                    <androidx.appcompat.widget.SwitchCompat
-                        android:id="@+id/switch_cache_toggle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:thumbTint="@color/colorTextGray"
-                        android:trackTint="@color/colorTextGray" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/colorThemeBackground" />
-
-                <TextView
+<TextView
                     android:id="@+id/btn_clear_cache"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

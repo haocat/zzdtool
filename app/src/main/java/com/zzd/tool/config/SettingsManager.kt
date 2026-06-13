@@ -18,8 +18,6 @@ object SettingsManager {
     private const val KEY_RECALL = "hook_recall"
     private const val KEY_FORWARD = "hook_forward"
     private const val KEY_BADGE = "hook_badge"
-    private const val KEY_CACHE = "dexkit_cache"
-
     private var cache: JSONObject? = null
     private var initialized = false
 
@@ -46,7 +44,6 @@ object SettingsManager {
     fun isRecallEnabled(): Boolean = cache?.optBoolean(KEY_RECALL, true) ?: true
     fun isForwardEnabled(): Boolean = cache?.optBoolean(KEY_FORWARD, true) ?: true
     fun isBadgeEnabled(): Boolean = cache?.optBoolean(KEY_BADGE, true) ?: true
-    fun isCacheEnabled(): Boolean = cache?.optBoolean(KEY_CACHE, true) ?: true
 
     // ── Activity 侧 ──
 
@@ -92,6 +89,5 @@ object SettingsManager {
         put(KEY_RECALL, true)
         put(KEY_FORWARD, true)
         put(KEY_BADGE, true)
-        put(KEY_CACHE, true)
     }
 }
