@@ -47,27 +47,29 @@ class HookEntry : IXposedHookLoadPackage {
         val cl = lpparam.classLoader
         Log.i(TAG, "浙政钉已加载")
 
-        val settingsAvailable = try {
-            val app = XposedHelpers.callStaticMethod(
-                XposedHelpers.findClass("android.app.ActivityThread", null),
-                "currentApplication"
-            ) as? android.app.Application
-            if (app != null) SettingsManager.initHooks(app) else false
-        } catch (e: Throwable) {
-            Log.w(TAG, "Cannot get context, all features enabled")
-            false
-        }
+        // Application.onCreate 时才有 Context → 延迟初始化 SettingsManager
+        try {
+            val appClass = XposedHelpers.findClass("android.app.Application", null)
+            XposedHelpers.findAndHookMethod(appClass, "onCreate",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        try {
+                            val app = param.thisObject as android.app.Application
+                            SettingsManager.initHooks(app)
+                        } catch (_: Throwable) {}
+                    }
+                })
+        } catch (_: Throwable) {}
 
         DexResolver.init(lpparam.appInfo.sourceDir, cl,
             cacheDir = "${lpparam.appInfo.dataDir}/files")
 
-        if (!settingsAvailable || SettingsManager.isTabletEnabled()) hookTablet(cl)
-        if (!settingsAvailable || SettingsManager.isRecallEnabled()) {
-            hookRecall(cl)
-            hookShield(cl)
-        }
-        if (!settingsAvailable || SettingsManager.isForwardEnabled()) hookForward(cl)
-        if (!settingsAvailable || SettingsManager.isBadgeEnabled()) hookViewHolder(cl)
+        // 所有 Hook 无条件下注册，回调内检查开关状态
+        hookTablet(cl)
+        hookRecall(cl)
+        hookShield(cl)
+        hookForward(cl)
+        hookViewHolder(cl)
 
         DexResolver.release()
         Log.i(TAG, "全部Hook完成")
@@ -84,6 +86,7 @@ class HookEntry : IXposedHookLoadPackage {
                 android.content.Context::class.java,
                 object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
+                        if (!SettingsManager.isTabletEnabled()) return
                         param.result = true
                     }
                 })
@@ -102,6 +105,7 @@ class HookEntry : IXposedHookLoadPackage {
                 cl, "recallStatus",
                 object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
+                        if (!SettingsManager.isRecallEnabled()) return
                         try {
                             val aimMsg = XposedHelpers.getObjectField(
                                 param.thisObject, "mAIMMessage")
@@ -132,6 +136,7 @@ class HookEntry : IXposedHookLoadPackage {
                 cl, "shieldStatus",
                 object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
+                        if (!SettingsManager.isRecallEnabled()) return
                         try {
                             val aimMsg = XposedHelpers.getObjectField(
                                 param.thisObject, "mAIMMessage")
@@ -169,9 +174,15 @@ class HookEntry : IXposedHookLoadPackage {
                 // fallback: 试 "i"（两版 APK 都没变）
                 methodName = "i"
             }
+            val forwardHook = object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    if (!SettingsManager.isForwardEnabled()) return
+                    param.result = true
+                }
+            }
             try {
                 XposedHelpers.findAndHookMethod("taurus.ckx", cl, methodName, msgClass,
-                    XC_MethodReplacement.returnConstant(true))
+                    forwardHook)
                 Log.i(TAG, "✔ ckx.$methodName")
             } catch (_: NoSuchMethodError) {
                 // 方法名可能变了 → fallback: 搜签名 (Message)→boolean
@@ -180,8 +191,7 @@ class HookEntry : IXposedHookLoadPackage {
                     if (m.returnType == java.lang.Boolean.TYPE && m.parameterTypes.size == 1
                         && m.parameterTypes[0] == msgClass) {
                         try {
-                            XposedHelpers.findAndHookMethod(ckxClass, m.name, msgClass,
-                                XC_MethodReplacement.returnConstant(true))
+                            XposedHelpers.findAndHookMethod(ckxClass, m.name, msgClass, forwardHook)
                             Log.i(TAG, "✔ ckx.${m.name}")
                             break
                         } catch (_: Throwable) {}
@@ -233,6 +243,7 @@ class HookEntry : IXposedHookLoadPackage {
                 android.view.ViewGroup::class.java,
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
+                        if (!SettingsManager.isBadgeEnabled()) return
                         try {
                             val rootView = param.result as? android.view.View ?: return
                             val position = (param.args[0] as? Int) ?: return

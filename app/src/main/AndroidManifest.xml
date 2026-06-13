@@ -53,5 +53,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
+
+        <provider
+            android:name=".config.SettingsProvider"
+            android:authorities="com.zzd.tool.settings"
+            android:exported="true" />
     </application>
 </manifest>

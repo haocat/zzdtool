@@ -23,7 +23,7 @@ class MainActivity : AppCompatActivity() {
         tvVersion.text = getString(R.string.module_version, BuildConfig.VERSION_NAME)
         tvStatus.text = "浙政钉工具\n平板登录 + 防撤回"
 
-        val prefs = SettingsManager.getActivityPrefs(this)
+        val settings = SettingsManager.loadSettings(this)
 
         val switchTablet = findViewById<SwitchCompat>(R.id.switch_tablet_toggle)
         val switchRecall = findViewById<SwitchCompat>(R.id.switch_recall_toggle)
@@ -31,26 +31,26 @@ class MainActivity : AppCompatActivity() {
         val switchBadge = findViewById<SwitchCompat>(R.id.switch_badge_toggle)
         val switchCache = findViewById<SwitchCompat>(R.id.switch_cache_toggle)
 
-        switchTablet.isChecked = prefs.getBoolean("hook_tablet", true)
-        switchRecall.isChecked = prefs.getBoolean("hook_recall", true)
-        switchForward.isChecked = prefs.getBoolean("hook_forward", true)
-        switchBadge.isChecked = prefs.getBoolean("hook_badge", true)
-        switchCache.isChecked = prefs.getBoolean("dexkit_cache", true)
+        switchTablet.isChecked = settings.optBoolean("hook_tablet", true)
+        switchRecall.isChecked = settings.optBoolean("hook_recall", true)
+        switchForward.isChecked = settings.optBoolean("hook_forward", true)
+        switchBadge.isChecked = settings.optBoolean("hook_badge", true)
+        switchCache.isChecked = settings.optBoolean("dexkit_cache", true)
 
         switchTablet.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("hook_tablet", isChecked).apply()
+            SettingsManager.saveSetting(this, "hook_tablet", isChecked)
         }
         switchRecall.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("hook_recall", isChecked).apply()
+            SettingsManager.saveSetting(this, "hook_recall", isChecked)
         }
         switchForward.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("hook_forward", isChecked).apply()
+            SettingsManager.saveSetting(this, "hook_forward", isChecked)
         }
         switchBadge.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("hook_badge", isChecked).apply()
+            SettingsManager.saveSetting(this, "hook_badge", isChecked)
         }
         switchCache.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("dexkit_cache", isChecked).apply()
+            SettingsManager.saveSetting(this, "dexkit_cache", isChecked)
         }
 
         findViewById<TextView>(R.id.btn_clear_cache).setOnClickListener {
