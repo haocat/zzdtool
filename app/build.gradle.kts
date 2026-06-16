@@ -46,6 +46,9 @@ dependencies {
     // DexKit — 运行时搜索混淆后的类/方法
     implementation("org.luckypray:dexkit:2.2.0")
 
+    // MMKV — 高性能跨进程 KV 存储
+    implementation("com.tencent:mmkv:1.3.9")
+
     // AndroidX
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
