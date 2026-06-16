@@ -4,6 +4,7 @@ import android.app.Application
 import android.os.Bundle
 import android.util.Log
 import com.zzd.tool.hook.core.DexResolver
+import com.zzd.tool.hook.core.HookStatus
 import com.tencent.mmkv.MMKV
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
@@ -29,6 +30,9 @@ class HookEntry : IXposedHookLoadPackage {
         val cl = lpparam.classLoader
         Log.i(TAG, "ZZD已加载")
 
+        HookStatus.init(isZygote = true, provider = detectHookProvider())
+        Log.i(TAG, "Hook框架: ${HookStatus.getHookProviderName()}")
+
         try {
             val appClass = XposedHelpers.findClass("android.app.Application", null)
             XposedHelpers.findAndHookMethod(appClass, "onCreate",
@@ -48,5 +52,21 @@ class HookEntry : IXposedHookLoadPackage {
 
         DexResolver.release()
         Log.i(TAG, "全部Hook完成")
+    }
+
+    private fun detectHookProvider(): String {
+        try {
+            val xposedClass = Class.forName("de.robv.android.xposed.XposedBridge")
+            val tagField = xposedClass.getDeclaredField("TAG")
+            val tag = tagField.get(null) as? String
+            return when {
+                tag?.startsWith("LSPosed") == true -> "LSPosed"
+                tag?.startsWith("EdXposed") == true -> "EdXposed"
+                tag?.startsWith("PineXposed") == true -> "Dreamland"
+                else -> "Legacy Xposed"
+            }
+        } catch (_: Throwable) {
+        }
+        return "Unknown"
     }
 }

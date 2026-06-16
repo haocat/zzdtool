@@ -11,6 +11,7 @@ import com.zzd.tool.BuildConfig
 import com.zzd.tool.R
 import com.zzd.tool.hook.core.SettingsManager
 import com.zzd.tool.hook.core.HookFeature
+import com.zzd.tool.hook.core.HookStatus
 
 class MainActivity : AppCompatActivity() {
 
@@ -67,14 +68,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkModuleStatus(tvStatus: TextView) {
-        val isActive = try {
-            Class.forName("de.robv.android.xposed.XposedBridge")
-            true
-        } catch (_: ClassNotFoundException) {
-            false
-        }
+        val isActive = HookStatus.isModuleEnabled()
+        val provider = HookStatus.getHookProviderName()
         tvStatus.text = if (isActive)
-            getString(R.string.module_is_activated)
+            getString(R.string.module_is_activated) + " ($provider)"
         else
             getString(R.string.module_not_activated)
     }
