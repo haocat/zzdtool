@@ -13,6 +13,8 @@ object HookStatus {
         hookProvider = provider
     }
 
+    fun isZygoteHookMode(): Boolean = isZygoteHookMode
+
     fun isLegacyXposed(): Boolean {
         return try {
             ClassLoader.getSystemClassLoader().loadClass("de.robv.android.xposed.XposedBridge")
