@@ -11,12 +11,13 @@ import androidx.appcompat.widget.SwitchCompat
 import com.zzd.tool.BuildConfig
 import com.zzd.tool.R
 import com.zzd.tool.hook.core.SettingsManager
-import com.zzd.tool.hook.core.HookFeature
-import com.zzd.tool.hook.core.HookStatus
 
 class MainActivity : AppCompatActivity() {
 
-    private val switchViews = mutableMapOf<HookFeature, SwitchCompat>()
+    private lateinit var switchTablet: SwitchCompat
+    private lateinit var switchRecall: SwitchCompat
+    private lateinit var switchForward: SwitchCompat
+    private lateinit var switchBadge: SwitchCompat
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,12 +27,12 @@ class MainActivity : AppCompatActivity() {
         val tvVersion = findViewById<TextView>(R.id.main_text_version)
 
         tvVersion.text = getString(R.string.module_version, BuildConfig.VERSION_NAME)
-        checkModuleStatus(tvStatus)
+        tvStatus.text = getString(R.string.module_subtitle)
 
-        switchViews[HookFeature.TABLET] = findViewById(R.id.switch_tablet_toggle)
-        switchViews[HookFeature.RECALL] = findViewById(R.id.switch_recall_toggle)
-        switchViews[HookFeature.FORWARD] = findViewById(R.id.switch_forward_toggle)
-        switchViews[HookFeature.BADGE] = findViewById(R.id.switch_badge_toggle)
+        switchTablet = findViewById(R.id.switch_tablet_toggle)
+        switchRecall = findViewById(R.id.switch_recall_toggle)
+        switchForward = findViewById(R.id.switch_forward_toggle)
+        switchBadge = findViewById(R.id.switch_badge_toggle)
 
         loadAndBindSwitches()
 
@@ -46,11 +47,15 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<TextView>(R.id.btn_reset_settings).setOnClickListener {
             try {
-                SettingsManager.resetAll()
-                switchViews.values.forEach { it.setOnCheckedChangeListener(null) }
-                switchViews.forEach { (feature, switch) ->
-                    switch.isChecked = feature.defaultEnabled
-                }
+                SettingsManager.resetAll(this)
+                switchTablet.setOnCheckedChangeListener(null)
+                switchRecall.setOnCheckedChangeListener(null)
+                switchForward.setOnCheckedChangeListener(null)
+                switchBadge.setOnCheckedChangeListener(null)
+                switchTablet.isChecked = true
+                switchRecall.isChecked = true
+                switchForward.isChecked = true
+                switchBadge.isChecked = true
                 Toast.makeText(this, R.string.settings_reset, Toast.LENGTH_SHORT).show()
             } catch (_: Exception) {
                 Toast.makeText(this, R.string.settings_reset_failed, Toast.LENGTH_SHORT).show()
@@ -59,22 +64,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadAndBindSwitches() {
-        val settings = SettingsManager.loadAll()
-        switchViews.forEach { (feature, switch) ->
-            switch.isChecked = settings[feature.key] ?: feature.defaultEnabled
-            switch.setOnCheckedChangeListener { _, isChecked ->
-                SettingsManager.putBoolean(feature.key, isChecked)
-            }
-        }
-    }
+        val settings = SettingsManager.loadAll(this)
+        switchTablet.isChecked = settings["hook_tablet"] ?: true
+        switchRecall.isChecked = settings["hook_recall"] ?: true
+        switchForward.isChecked = settings["hook_forward"] ?: true
+        switchBadge.isChecked = settings["hook_badge"] ?: true
 
-    private fun checkModuleStatus(tvStatus: TextView) {
-        val isActive = HookStatus.isModuleEnabled()
-        val provider = HookStatus.detectProvider()
-        Log.i("ZddTool", "Module status: active=$isActive, provider=$provider")
-        tvStatus.text = if (isActive)
-            getString(R.string.module_is_activated) + " ($provider)"
-        else
-            getString(R.string.module_not_activated)
+        switchTablet.setOnCheckedChangeListener { _, isChecked ->
+            SettingsManager.putBoolean(this, "hook_tablet", isChecked)
+        }
+        switchRecall.setOnCheckedChangeListener { _, isChecked ->
+            SettingsManager.putBoolean(this, "hook_recall", isChecked)
+        }
+        switchForward.setOnCheckedChangeListener { _, isChecked ->
+            SettingsManager.putBoolean(this, "hook_forward", isChecked)
+        }
+        switchBadge.setOnCheckedChangeListener { _, isChecked ->
+            SettingsManager.putBoolean(this, "hook_badge", isChecked)
+        }
     }
 }
