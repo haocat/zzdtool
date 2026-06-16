@@ -22,10 +22,7 @@ object DexResolver {
     private var _apkKey: String? = null
     private var _apkPath: String? = null
 
-    // 内存缓存：searchKey → Class<?>
     private val classCache = HashMap<String, Class<*>>()
-
-    // 持久缓存：searchKey → className (String)
     private val classNameCache = HashMap<String, String>()
 
     init {
@@ -46,13 +43,11 @@ object DexResolver {
 
         if (cacheDir != null && loadCache()) {
             Log.i(TAG, "DexResolver: 使用缓存")
-            // bridge 不创建，等缓存未命中时按需创建
         } else {
             ensureBridge()
         }
     }
 
-    /** 按需创建 bridge（缓存未命中时调用） */
     private fun ensureBridge(): Boolean {
         if (bridge != null) return true
         val path = _apkPath ?: return false
@@ -63,8 +58,6 @@ object DexResolver {
         return true
     }
 
-    // ── 找类 ──
-
     fun findClassByStrings(vararg traitStrings: String): Class<*>? {
         return findClassesByStrings(*traitStrings).firstOrNull()
     }
@@ -73,11 +66,9 @@ object DexResolver {
         val key = traitStrings.joinToString("|")
         val l = _loader ?: return emptyList()
 
-        // 1. 内存缓存
         val cached = classCache[key]
         if (cached != null) return listOf(cached)
 
-        // 2. 持久缓存
         val cachedName = classNameCache[key]
         if (cachedName != null) {
             try {
@@ -89,7 +80,6 @@ object DexResolver {
             }
         }
 
-        // 3. 未命中 → 需要 bridge 扫描（第一次使用才创建）
         if (!ensureBridge()) return emptyList()
         val b = bridge ?: return emptyList()
 
@@ -113,23 +103,6 @@ object DexResolver {
         return result
     }
 
-    /** 通过字符串特征找方法名（不依赖类名、方法名） */
-    fun findMethodNameByStrings(vararg strings: String): String? {
-        val key = "mstr:${strings.joinToString("|")}"
-        if (!ensureBridge()) return null
-        val b = bridge ?: return null
-        return try {
-            b.findMethod {
-                searchPackages("taurus")
-                matcher { usingStrings(*strings) }
-            }.firstOrNull()?.name?.also { name ->
-                Log.i(TAG, "✔ method $key → $name")
-            }
-        } catch (e: Exception) { null }
-    }
-
-    // ── 缓存 ──
-
     private fun cacheFile(): File? {
         val dir = _cacheDir ?: return null
         return File(dir, CACHE_FILE)
@@ -152,8 +125,7 @@ object DexResolver {
             }
             Log.i(TAG, "✔ 缓存加载成功 (${classNameCache.size} 条)")
             true
-        } catch (e: Exception) {
-            Log.e(TAG, "✘ 缓存加载失败: ${e.message}")
+        } catch (_: Exception) {
             file.delete()
             false
         }
@@ -175,13 +147,6 @@ object DexResolver {
         } catch (e: Exception) {
             Log.e(TAG, "✘ 缓存保存失败: ${e.message}")
         }
-    }
-
-    // ── 其他 ──
-
-    fun findIntNoArgMethods(cls: Class<*>): List<java.lang.reflect.Method> {
-        return try { cls.declaredMethods.toList() } catch (_: Throwable) { emptyList() }
-            .filter { it.parameterCount == 0 && (it.returnType == Integer.TYPE || it.returnType == Int::class.java) }
     }
 
     fun release() {
