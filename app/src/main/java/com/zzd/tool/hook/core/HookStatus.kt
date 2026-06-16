@@ -13,13 +13,9 @@ object HookStatus {
         hookProvider = provider
     }
 
-    fun isZygoteHookMode(): Boolean = isZygoteHookMode
-
-    fun getHookProvider(): String? = hookProvider
-
     fun isLegacyXposed(): Boolean {
         return try {
-            Class.forName("de.robv.android.xposed.XposedBridge")
+            ClassLoader.getSystemClassLoader().loadClass("de.robv.android.xposed.XposedBridge")
             true
         } catch (_: ClassNotFoundException) {
             false
@@ -41,10 +37,10 @@ object HookStatus {
 
     fun getHookProviderName(): String {
         if (isZygoteHookMode) {
-            return hookProvider ?: "Unknown(Zygote)"
+            return hookProvider ?: "Zygote"
         }
         if (isLegacyXposed()) {
-            return "Legacy Xposed"
+            return "Xposed"
         }
         return "None"
     }

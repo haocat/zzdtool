@@ -3,6 +3,7 @@
 package com.zzd.tool.ui.activity
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -68,8 +69,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkModuleStatus(tvStatus: TextView) {
+        val isLegacy = HookStatus.isLegacyXposed()
+        val isZygote = HookStatus.isZygoteHookMode()
         val isActive = HookStatus.isModuleEnabled()
         val provider = HookStatus.getHookProviderName()
+
+        Log.i("ZddTool", "Module status: legacy=$isLegacy, zygote=$isZygote, active=$isActive, provider=$provider")
+
         tvStatus.text = if (isActive)
             getString(R.string.module_is_activated) + " ($provider)"
         else
