@@ -87,7 +87,7 @@ class AntiRecallHook : BaseHook(HookFeature.RECALL) {
         0
     }
 
-    fun recallBadge(type: Int): String =
+    private fun recallBadge(type: Int): String =
         if (type == RECALL_TYPE_ADMIN || type == RECALL_TYPE_GROUP_OWNER)
             "⤴管理员已撤回" else "⤴已撤回"
 }

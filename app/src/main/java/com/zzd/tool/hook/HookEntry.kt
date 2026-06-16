@@ -17,18 +17,24 @@ class HookEntry : IXposedHookLoadPackage {
         private const val TARGET = "com.alibaba.taurus.zhejiang"
     }
 
-    private val hooks = listOf(
-        SettingEntryHook(),
-        TabletModeHook(),
-        AntiRecallHook(),
-        ForwardUnlockHook(),
-        MessageBadgeHook()
-    )
-
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         if (lpparam.packageName != TARGET) return
         val cl = lpparam.classLoader
         Log.i(TAG, "ZZD已加载")
+
+        DexResolver.init(lpparam.appInfo.sourceDir, cl,
+            cacheDir = "${lpparam.appInfo.dataDir}/files")
+
+        // 设置入口 hook（不依赖 settings）
+        SettingEntryHook().init(cl)
+
+        // 其余 hook 需要 settings，延迟到 Application.onCreate 后注册
+        val functionalHooks = listOf(
+            TabletModeHook(),
+            AntiRecallHook(),
+            ForwardUnlockHook(),
+            MessageBadgeHook()
+        )
 
         try {
             val appClass = XposedHelpers.findClass("android.app.Application", null)
@@ -38,17 +44,13 @@ class HookEntry : IXposedHookLoadPackage {
                         val app = param.thisObject as? Application ?: return
                         SettingsManager.initFromContentResolver(app)
                         Log.i(TAG, "Hook框架: ${detectHookProvider()}")
+                        functionalHooks.forEach { it.init(cl) }
+                        Log.i(TAG, "全部Hook完成")
                     }
                 })
         } catch (_: Throwable) {}
 
-        DexResolver.init(lpparam.appInfo.sourceDir, cl,
-            cacheDir = "${lpparam.appInfo.dataDir}/files")
-
-        hooks.forEach { it.init(cl) }
-
         DexResolver.release()
-        Log.i(TAG, "全部Hook完成")
     }
 
     private fun detectHookProvider(): String {
