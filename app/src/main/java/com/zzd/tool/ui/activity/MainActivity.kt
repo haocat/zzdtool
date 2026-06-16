@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<TextView>(R.id.btn_reset_settings).setOnClickListener {
             try {
-                SettingsManager.resetAll()
+                SettingsManager.resetAll(this)
                 switchViews.values.forEach { it.setOnCheckedChangeListener(null) }
                 switchViews.forEach { (feature, switch) ->
                     switch.isChecked = feature.defaultEnabled
@@ -63,18 +63,16 @@ class MainActivity : AppCompatActivity() {
         switchViews.forEach { (feature, switch) ->
             switch.isChecked = settings[feature.key] ?: feature.defaultEnabled
             switch.setOnCheckedChangeListener { _, isChecked ->
-                SettingsManager.putBoolean(feature.key, isChecked)
+                SettingsManager.putBoolean(this, feature.key, isChecked)
             }
         }
     }
 
     private fun checkModuleStatus(tvStatus: TextView) {
-        val isLegacy = HookStatus.isLegacyXposed()
-        val isZygote = HookStatus.isZygoteHookMode()
-        val isActive = HookStatus.isModuleEnabled()
-        val provider = HookStatus.getHookProviderName()
+        val isActive = HookStatus.isModuleEnabled(this)
+        val provider = HookStatus.getHookProviderName(this)
 
-        Log.i("ZddTool", "Module status: legacy=$isLegacy, zygote=$isZygote, active=$isActive, provider=$provider")
+        Log.i("ZddTool", "Module status: active=$isActive, provider=$provider")
 
         tvStatus.text = if (isActive)
             getString(R.string.module_is_activated) + " ($provider)"

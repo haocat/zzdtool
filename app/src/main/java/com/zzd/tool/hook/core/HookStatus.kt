@@ -1,46 +1,38 @@
 package com.zzd.tool.hook.core
 
 import android.content.Context
-import android.content.pm.PackageManager
-import com.tencent.mmkv.MMKV
+import android.net.Uri
+import com.zzd.tool.config.StatusProvider
 
 object HookStatus {
 
-    private const val KEY_ACTIVATED = "module_activated"
-    private const val KEY_PROVIDER = "hook_provider"
-
-    private val mmkv by lazy {
-        MMKV.mmkvWithID("zzdtool_status", MMKV.MULTI_PROCESS_MODE)
-    }
+    private const val AUTHORITY = "com.zzd.tool.status"
 
     fun init(provider: String?) {
-        mmkv.encode(KEY_ACTIVATED, true)
-        mmkv.encode(KEY_PROVIDER, provider ?: "Unknown")
+        StatusProvider.setStatus(true, provider)
     }
 
-    fun isLegacyXposed(): Boolean {
+    fun isModuleEnabled(context: Context): Boolean {
+        return queryStatus(context)?.firstOrNull() == "true"
+    }
+
+    fun getHookProviderName(context: Context): String {
+        return queryStatus(context)?.getOrNull(1) ?: "None"
+    }
+
+    private fun queryStatus(context: Context): Array<String>? {
         return try {
-            ClassLoader.getSystemClassLoader().loadClass("de.robv.android.xposed.XposedBridge")
-            true
-        } catch (_: ClassNotFoundException) {
-            false
+            val uri = Uri.parse("content://$AUTHORITY/check")
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    arrayOf(
+                        cursor.getString(cursor.getColumnIndexOrThrow("activated")),
+                        cursor.getString(cursor.getColumnIndexOrThrow("provider"))
+                    )
+                } else null
+            }
+        } catch (_: Exception) {
+            null
         }
-    }
-
-    fun isModuleEnabled(): Boolean {
-        return mmkv.decodeBool(KEY_ACTIVATED, false)
-    }
-
-    fun isTaiChiInstalled(context: Context): Boolean {
-        return try {
-            context.packageManager.getPackageInfo("me.weishu.exp", 0)
-            true
-        } catch (_: PackageManager.NameNotFoundException) {
-            false
-        }
-    }
-
-    fun getHookProviderName(): String {
-        return mmkv.decodeString(KEY_PROVIDER, "None") ?: "None"
     }
 }

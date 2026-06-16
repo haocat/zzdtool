@@ -1,52 +1,65 @@
 package com.zzd.tool.hook.core
 
+import android.content.Context
+import android.net.Uri
 import android.util.Log
-import com.tencent.mmkv.MMKV
+import org.json.JSONObject
 
 object SettingsManager {
 
     private const val TAG = "ZddTool"
+    private const val AUTHORITY = "com.zzd.tool.settings"
 
-    private val mmkv by lazy {
-        MMKV.mmkvWithID("zzdtool_config", MMKV.MULTI_PROCESS_MODE)
+    fun getBoolean(key: String): Boolean {
+        return try {
+            val uri = Uri.parse("content://$AUTHORITY/settings")
+            val cursor = android.app.ActivityThread.currentApplication()
+                ?.contentResolver?.query(uri, null, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val json = JSONObject(it.getString(0))
+                    json.optBoolean(key, true)
+                } else true
+            } ?: true
+        } catch (_: Exception) {
+            true
+        }
     }
 
-    fun getBoolean(key: String, default: Boolean): Boolean =
-        mmkv.decodeBool(key, default)
-
-    fun putBoolean(key: String, value: Boolean) {
-        mmkv.encode(key, value)
-        Log.i(TAG, "Settings: $key=$value")
+    fun putBoolean(context: Context, key: String, value: Boolean) {
+        try {
+            context.getSharedPreferences("zzdtool_settings", Context.MODE_PRIVATE)
+                .edit().putBoolean(key, value).commit()
+            Log.i(TAG, "Settings: $key=$value")
+        } catch (e: Exception) {
+            Log.e(TAG, "Settings save failed: ${e.message}")
+        }
     }
 
     fun loadAll(): Map<String, Boolean> {
         val result = mutableMapOf<String, Boolean>()
         for (feature in HookFeature.entries) {
-            result[feature.key] = getBoolean(feature.key, feature.defaultEnabled)
+            result[feature.key] = getBoolean(feature.key)
         }
         return result
     }
 
-    fun saveAll(settings: Map<String, Boolean>) {
-        settings.forEach { (key, value) ->
-            mmkv.encode(key, value)
-        }
-        Log.i(TAG, "Settings: saved ${settings.size} items")
-    }
-
-    fun resetAll() {
-        HookFeature.entries.forEach { mmkv.remove(it.key) }
-        Log.i(TAG, "Settings: reset to defaults")
-    }
-
-    fun clearDexKitCache(cacheDir: java.io.File?) {
+    fun resetAll(context: Context) {
         try {
-            val cacheFile = java.io.File(cacheDir, "zzdtool_dexkit.json")
+            context.getSharedPreferences("zzdtool_settings", Context.MODE_PRIVATE)
+                .edit().clear().commit()
+            Log.i(TAG, "Settings: reset to defaults")
+        } catch (e: Exception) {
+            Log.e(TAG, "Settings reset failed: ${e.message}")
+        }
+    }
+
+    fun clearDexKitCache(context: Context) {
+        try {
+            val cacheFile = java.io.File(context.filesDir, "zzdtool_dexkit.json")
             if (cacheFile.exists()) {
                 cacheFile.delete()
                 Log.i(TAG, "DexKit cache cleared")
-            } else {
-                Log.w(TAG, "DexKit cache file not found")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to clear cache: ${e.message}")

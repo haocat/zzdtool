@@ -17,7 +17,7 @@ abstract class BaseHook(
     val label: String get() = feature.label
 
     fun isEnabled(): Boolean =
-        SettingsManager.getBoolean(hookKey, feature.defaultEnabled)
+        SettingsManager.getBoolean(hookKey)
 
     fun isInitialized(): Boolean = initialized
 
