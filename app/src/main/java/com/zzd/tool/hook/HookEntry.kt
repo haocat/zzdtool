@@ -1,8 +1,8 @@
 package com.zzd.tool.hook
 
 import android.app.Application
-import android.os.Bundle
 import android.util.Log
+import com.tencent.mmkv.MMKV
 import com.zzd.tool.hook.core.DexResolver
 import com.zzd.tool.hook.core.SettingsManager
 import de.robv.android.xposed.IXposedHookLoadPackage
@@ -17,15 +17,16 @@ class HookEntry : IXposedHookLoadPackage {
         private const val TARGET = "com.alibaba.taurus.zhejiang"
     }
 
+    private var apkPath: String? = null
+    private var hostCl: ClassLoader? = null
+
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         if (lpparam.packageName != TARGET) return
-        val cl = lpparam.classLoader
+        hostCl = lpparam.classLoader
+        apkPath = lpparam.appInfo.sourceDir
         Log.i(TAG, "ZZD已加载")
 
-        DexResolver.init(lpparam.appInfo.sourceDir, cl,
-            cacheDir = "${lpparam.appInfo.dataDir}/files")
-
-        SettingEntryHook().init(cl)
+        SettingEntryHook().init(hostCl!!)
 
         val functionalHooks = listOf(
             TabletModeHook(),
@@ -43,31 +44,44 @@ class HookEntry : IXposedHookLoadPackage {
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         val app = param.thisObject as? Application ?: return
-                        writeActivationStatus(app, provider)
+                        if (app.packageName != TARGET) return
+
+                        MMKV.initialize(app)
+
+                        DexResolver.init(apkPath!!, hostCl!!)
                         SettingsManager.initFromContentResolver(app)
-                        functionalHooks.forEach { it.init(cl) }
+
+                        writeActivationStatus(app, provider)
+
+                        functionalHooks.forEach { it.init(hostCl!!) }
+                        DexResolver.release()
                         Log.i(TAG, "全部Hook完成")
                     }
                 })
         } catch (_: Throwable) {}
+    }
 
-        DexResolver.release()
+    private fun writeActivationStatus(app: Application, provider: String) {
+        try {
+            val uri = android.net.Uri.parse("content://com.zzd.tool.settings/settings")
+            app.contentResolver.call(uri, "activate", provider, null)
+            Log.i(TAG, "激活状态已写入: $provider")
+        } catch (e: Throwable) {
+            Log.w(TAG, "写入激活状态失败: ${e.message}")
+        }
     }
 
     private fun detectHookProvider(): String {
-        // 方法1: 检查 LSPosed 专属类
         try {
             ClassLoader.getSystemClassLoader().loadClass("org.lsposed.lspd.service.LSPosedService")
             return "LSPosed"
         } catch (_: Throwable) {}
 
-        // 方法2: 检查 EdXposed 专属类
         try {
             ClassLoader.getSystemClassLoader().loadClass("com.swiftshader.edxposed.EdXposed")
             return "EdXposed"
         } catch (_: Throwable) {}
 
-        // 方法3: 检查 TAG 字段
         try {
             val xposedClass = ClassLoader.getSystemClassLoader()
                 .loadClass("de.robv.android.xposed.XposedBridge")
@@ -83,22 +97,11 @@ class HookEntry : IXposedHookLoadPackage {
             }
         } catch (_: Throwable) {}
 
-        // 方法4: 检查类名是否被混淆（LSPosed 会混淆类名）
         try {
             ClassLoader.getSystemClassLoader().loadClass("de.robv.android.xposed.XposedBridge")
             return "Xposed"
         } catch (_: Throwable) {}
 
         return "Unknown"
-    }
-
-    private fun writeActivationStatus(app: Application, provider: String) {
-        try {
-            val uri = android.net.Uri.parse("content://com.zzd.tool.settings/settings")
-            app.contentResolver.call(uri, "activate", provider, null)
-            Log.i(TAG, "激活状态已写入: $provider")
-        } catch (e: Throwable) {
-            Log.w(TAG, "写入激活状态失败: ${e.message}")
-        }
     }
 }

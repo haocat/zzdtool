@@ -7,6 +7,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
+import com.tencent.mmkv.MMKV
 import com.zzd.tool.BuildConfig
 import com.zzd.tool.R
 import com.zzd.tool.hook.core.SettingsManager
@@ -22,6 +23,8 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        MMKV.initialize(this)
 
         tvStatus = findViewById(R.id.main_text_status)
         val tvVersion = findViewById<TextView>(R.id.main_text_version)

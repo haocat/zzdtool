@@ -6,7 +6,6 @@ import android.widget.TextView
 import com.zzd.tool.hook.core.BaseHook
 import com.zzd.tool.hook.core.DexResolver
 import com.zzd.tool.hook.core.HookFeature
-import com.zzd.tool.hook.core.HookUtils
 import com.zzd.tool.hook.core.SettingsManager
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedHelpers
@@ -20,6 +19,9 @@ class MessageBadgeHook : BaseHook(HookFeature.BADGE) {
         private const val TAG = "ZddTool"
         private const val BADGE_TAG = "zdd_badge"
         private val resIdCache = HashMap<String, Int>()
+        private val timeFormat = object : ThreadLocal<SimpleDateFormat>() {
+            override fun initialValue() = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        }
 
         fun resId(view: android.view.View, name: String): Int {
             return resIdCache.getOrPut(name) {
@@ -109,7 +111,7 @@ class MessageBadgeHook : BaseHook(HookFeature.BADGE) {
 
     private fun formatTime(msg: Any): String = try {
         val ts = XposedHelpers.callMethod(msg, "createdAt") as? Long ?: return ""
-        SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(ts))
+        timeFormat.get()!!.format(Date(ts))
     } catch (_: Exception) {
         ""
     }

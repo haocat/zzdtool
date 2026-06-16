@@ -35,7 +35,7 @@ ZZD 通用设置页
   └──────────────────────────────┘
         ↓ 点击
   模块 MainActivity（独立进程）
-        ↓ ContentProvider 跨进程通信
+        ↓ ContentProvider + MMKV 跨进程通信
   HookEntry（宿主进程）读取设置
 ```
 
@@ -44,33 +44,39 @@ ZZD 通用设置页
 ```
 app/src/main/java/com/zzd/tool/
 ├── hook/
-│   ├── HookEntry.kt              Xposed 入口，延迟注册 functional hooks
+│   ├── HookEntry.kt              Xposed 入口，Application.onCreate 后初始化
 │   ├── SettingEntryHook.kt       注入 ZZD 通用设置页入口
 │   ├── TabletModeHook.kt         平板模式
-│   ├── AntiRecallHook.kt         防撤回
-│   ├── ForwardUnlockHook.kt      转发解锁
-│   ├── MessageBadgeHook.kt       消息徽章
+│   ├── AntiRecallHook.kt         防撤回（hook recallStatus/shieldStatus）
+│   ├── ForwardUnlockHook.kt      转发解锁（DexKit 反混淆定位）
+│   ├── MessageBadgeHook.kt       消息徽章（时间戳/撤回标记）
 │   └── core/
 │       ├── BaseHook.kt           抽象基类（初始化、开关、错误追踪）
 │       ├── HookFeature.kt        枚举（统一管理 Hook Key）
 │       ├── HookUtils.kt          工具方法（hookBeforeIfEnabled 等）
-│       ├── DexResolver.kt        DexKit 封装（按需创建 bridge + 缓存）
-│       └── SettingsManager.kt    ContentProvider 跨进程设置读写
+│       ├── DexResolver.kt        DexKit 封装（MMKV 缓存 + 按需 bridge）
+│       └── SettingsManager.kt    跨进程设置读写（ContentProvider + MMKV）
 ├── config/
-│   └── SettingsProvider.kt       ContentProvider（宿主进程查询设置）
+│   └── SettingsProvider.kt       ContentProvider（MMKV 存储，宿主进程查询）
 └── ui/activity/
-    └── MainActivity.kt           模块设置页
+    └── MainActivity.kt           模块设置页（MMKV 直读）
 ```
+
+### 核心设计
+
+- **延迟初始化**：所有 functional hook 在 `Application.onCreate` 后注册，确保宿主 Context 可用
+- **DexKit 缓存**：MMKV 存储混淆类名映射，APK 更新后自动失效重扫
+- **跨进程设置**：ContentProvider + MMKV，模块 App 写入 MMKV，宿主进程通过 ContentProvider 读取
+- **BaseHook 基类**：统一管理初始化状态、开关检查、错误追踪
+- **HookUtils 工具类**：封装 `hookBeforeIfEnabled` / `hookAfterIfEnabled`，运行时检查开关状态
+
+### 防撤回机制
+
+浙政钉的撤回逻辑是给消息打 `isRecall=true` 标记，UI 层通过 `recallStatus()` 和 `shieldStatus()` 控制显示。模块通过 hook 这两个方法返回 0 来阻止消息被隐藏。
 
 ### 设计参考
 
-架构参照 [QAuxiliary](https://github.com/cinit/QAuxiliary) 的设计：
-
-- **BaseHook 基类**：统一管理初始化状态、开关检查、错误追踪
-- **注解式注册**：`HookFeature` 枚举管理所有 Hook Key
-- **HookUtils 工具类**：封装 `hookBeforeIfEnabled` / `hookAfterIfEnabled`，减少重复代码
-- **DexKit 反混淆**：运行时动态定位混淆后的方法
-- **ContentProvider 跨进程**：设置只在 `Application.onCreate` 时读取一次
+架构参照 [QAuxiliary](https://github.com/cinit/QAuxiliary) 的设计。
 
 ## 编译
 
@@ -87,6 +93,7 @@ app/src/main/java/com/zzd/tool/
 - JDK 17+
 - Android SDK（compileSdk 36）
 - DexKit 2.2.0
+- MMKV 1.3.9
 - Xposed API 82（compileOnly）
 
 ## 设置说明
