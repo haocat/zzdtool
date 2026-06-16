@@ -22,6 +22,9 @@ class HookEntry : IXposedHookLoadPackage {
         val cl = lpparam.classLoader
         Log.i(TAG, "ZZD已加载")
 
+        // 写入激活状态
+        writeActivationStatus(lpparam)
+
         DexResolver.init(lpparam.appInfo.sourceDir, cl,
             cacheDir = "${lpparam.appInfo.dataDir}/files")
 
@@ -65,5 +68,17 @@ class HookEntry : IXposedHookLoadPackage {
                 else -> "Xposed"
             }
         } catch (_: Throwable) { "None" }
+    }
+
+    private fun writeActivationStatus(lpparam: XC_LoadPackage.LoadPackageParam) {
+        try {
+            val provider = detectHookProvider()
+            val app = android.app.ActivityThread.currentApplication() ?: return
+            val uri = android.net.Uri.parse("content://com.zzd.tool.settings/settings")
+            app.contentResolver.call(uri, "activate", provider, null)
+            Log.i(TAG, "激活状态已写入: $provider")
+        } catch (e: Throwable) {
+            Log.w(TAG, "写入激活状态失败: ${e.message}")
+        }
     }
 }

@@ -45,6 +45,8 @@ class SettingsProvider : ContentProvider() {
                 put("hook_recall", prefs.getBoolean("hook_recall", true))
                 put("hook_forward", prefs.getBoolean("hook_forward", true))
                 put("hook_badge", prefs.getBoolean("hook_badge", true))
+                put("activated", prefs.getBoolean("activated", false))
+                put("provider", prefs.getString("provider", "None"))
             }
         } catch (_: Exception) {
             JSONObject(defaults.toString())
@@ -56,4 +58,16 @@ class SettingsProvider : ContentProvider() {
     override fun delete(uri: Uri, selection: String?, selectionArgs: Array<String>?): Int = 0
     override fun update(uri: Uri, values: ContentValues?, selection: String?,
                         selectionArgs: Array<String>?): Int = 0
+
+    override fun call(method: String, arg: String?, extras: android.os.Bundle?): android.os.Bundle {
+        return android.os.Bundle().apply {
+            if (method == "activate") {
+                context?.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+                    ?.edit()
+                    ?.putBoolean("activated", true)
+                    ?.putString("provider", arg ?: "Unknown")
+                    ?.commit()
+            }
+        }
+    }
 }

@@ -31,6 +31,10 @@ object SettingsManager {
         return cache?.optBoolean(key, true) ?: true
     }
 
+    fun isActivated(): Boolean = cache?.optBoolean("activated", false) ?: false
+
+    fun getProvider(): String = cache?.optString("provider", "None") ?: "None"
+
     fun loadAll(context: Context): Map<String, Boolean> {
         val prefs = context.getSharedPreferences("zzdtool_settings", Context.MODE_PRIVATE)
         return mapOf(

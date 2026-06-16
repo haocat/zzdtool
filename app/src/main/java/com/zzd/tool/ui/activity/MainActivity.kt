@@ -27,7 +27,7 @@ class MainActivity : AppCompatActivity() {
         val tvVersion = findViewById<TextView>(R.id.main_text_version)
 
         tvVersion.text = getString(R.string.module_version, BuildConfig.VERSION_NAME)
-        tvStatus.text = getString(R.string.module_subtitle)
+        checkActivationStatus(tvStatus)
 
         switchTablet = findViewById(R.id.switch_tablet_toggle)
         switchRecall = findViewById(R.id.switch_recall_toggle)
@@ -82,5 +82,15 @@ class MainActivity : AppCompatActivity() {
         switchBadge.setOnCheckedChangeListener { _, isChecked ->
             SettingsManager.putBoolean(this, "hook_badge", isChecked)
         }
+    }
+
+    private fun checkActivationStatus(tvStatus: TextView) {
+        SettingsManager.initFromContentResolver(this)
+        val isActive = SettingsManager.isActivated()
+        val provider = SettingsManager.getProvider()
+        tvStatus.text = if (isActive)
+            getString(R.string.module_is_activated) + " ($provider)"
+        else
+            getString(R.string.module_not_activated)
     }
 }
