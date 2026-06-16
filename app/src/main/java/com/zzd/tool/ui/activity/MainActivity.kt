@@ -38,7 +38,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 SettingsManager.clearDexKitCache(filesDir)
                 Toast.makeText(this, R.string.cache_cleared, Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 Toast.makeText(this, R.string.cache_clear_failed, Toast.LENGTH_SHORT).show()
             }
         }
@@ -51,7 +51,7 @@ class MainActivity : AppCompatActivity() {
                     switch.isChecked = feature.defaultEnabled
                 }
                 Toast.makeText(this, R.string.settings_reset, Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 Toast.makeText(this, R.string.settings_reset_failed, Toast.LENGTH_SHORT).show()
             }
         }
