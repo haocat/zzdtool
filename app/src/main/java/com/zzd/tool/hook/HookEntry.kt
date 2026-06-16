@@ -1,13 +1,10 @@
 package com.zzd.tool.hook
 
-import android.app.Application
-import android.os.Bundle
 import android.util.Log
 import com.zzd.tool.hook.core.DexResolver
 import com.zzd.tool.hook.core.HookStatus
 import com.tencent.mmkv.MMKV
 import de.robv.android.xposed.IXposedHookLoadPackage
-import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
@@ -30,20 +27,9 @@ class HookEntry : IXposedHookLoadPackage {
         val cl = lpparam.classLoader
         Log.i(TAG, "ZZD已加载")
 
-        HookStatus.init(isZygote = true, provider = detectHookProvider())
+        MMKV.initialize(lpparam.appInfo.dataDir)
+        HookStatus.init(provider = detectHookProvider())
         Log.i(TAG, "Hook框架: ${HookStatus.getHookProviderName()}")
-
-        try {
-            val appClass = XposedHelpers.findClass("android.app.Application", null)
-            XposedHelpers.findAndHookMethod(appClass, "onCreate",
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        val app = param.thisObject as? Application ?: return
-                        MMKV.initialize(app)
-                    }
-                })
-        } catch (_: Throwable) {
-        }
 
         DexResolver.init(lpparam.appInfo.sourceDir, cl,
             cacheDir = "${lpparam.appInfo.dataDir}/files")

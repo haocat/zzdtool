@@ -2,18 +2,21 @@ package com.zzd.tool.hook.core
 
 import android.content.Context
 import android.content.pm.PackageManager
+import com.tencent.mmkv.MMKV
 
 object HookStatus {
 
-    private var isZygoteHookMode = false
-    private var hookProvider: String? = null
+    private const val KEY_ACTIVATED = "module_activated"
+    private const val KEY_PROVIDER = "hook_provider"
 
-    fun init(isZygote: Boolean, provider: String?) {
-        isZygoteHookMode = isZygote
-        hookProvider = provider
+    private val mmkv by lazy {
+        MMKV.mmkvWithID("zzdtool_status", MMKV.MULTI_PROCESS_MODE)
     }
 
-    fun isZygoteHookMode(): Boolean = isZygoteHookMode
+    fun init(provider: String?) {
+        mmkv.encode(KEY_ACTIVATED, true)
+        mmkv.encode(KEY_PROVIDER, provider ?: "Unknown")
+    }
 
     fun isLegacyXposed(): Boolean {
         return try {
@@ -25,7 +28,7 @@ object HookStatus {
     }
 
     fun isModuleEnabled(): Boolean {
-        return isLegacyXposed() || isZygoteHookMode
+        return mmkv.decodeBool(KEY_ACTIVATED, false)
     }
 
     fun isTaiChiInstalled(context: Context): Boolean {
@@ -38,12 +41,6 @@ object HookStatus {
     }
 
     fun getHookProviderName(): String {
-        if (isZygoteHookMode) {
-            return hookProvider ?: "Zygote"
-        }
-        if (isLegacyXposed()) {
-            return "Xposed"
-        }
-        return "None"
+        return mmkv.decodeString(KEY_PROVIDER, "None") ?: "None"
     }
 }
