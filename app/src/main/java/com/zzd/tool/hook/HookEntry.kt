@@ -73,9 +73,11 @@ class HookEntry : IXposedHookLoadPackage {
     private fun writeActivationStatus(lpparam: XC_LoadPackage.LoadPackageParam) {
         try {
             val provider = detectHookProvider()
-            val app = android.app.ActivityThread.currentApplication() ?: return
+            val appClass = Class.forName("android.app.ActivityThread")
+            val currentApp = appClass.getDeclaredMethod("currentApplication").invoke(null)
+            val ctx = currentApp as? android.content.Context ?: return
             val uri = android.net.Uri.parse("content://com.zzd.tool.settings/settings")
-            app.contentResolver.call(uri, "activate", provider, null)
+            ctx.contentResolver.call(uri, "activate", provider, null)
             Log.i(TAG, "激活状态已写入: $provider")
         } catch (e: Throwable) {
             Log.w(TAG, "写入激活状态失败: ${e.message}")
