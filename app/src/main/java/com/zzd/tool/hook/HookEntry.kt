@@ -5,7 +5,6 @@ import com.zzd.tool.hook.core.DexResolver
 import com.zzd.tool.hook.core.HookStatus
 import com.tencent.mmkv.MMKV
 import de.robv.android.xposed.IXposedHookLoadPackage
-import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 class HookEntry : IXposedHookLoadPackage {
@@ -13,7 +12,6 @@ class HookEntry : IXposedHookLoadPackage {
     companion object {
         private const val TAG = "ZddTool"
         private const val TARGET = "com.alibaba.taurus.zhejiang"
-        private const val MODULE_PKG = "com.zzd.tool"
     }
 
     private val hooks = listOf(
@@ -28,10 +26,9 @@ class HookEntry : IXposedHookLoadPackage {
         val cl = lpparam.classLoader
         Log.i(TAG, "ZZD已加载")
 
-        // 用模块的 dataDir 初始化 MMKV，确保两个进程读写同一个文件
-        MMKV.initialize("/data/data/$MODULE_PKG/files")
-        HookStatus.init(provider = detectHookProvider())
-        Log.i(TAG, "Hook框架: ${HookStatus.getHookProviderName()}")
+        MMKV.initialize(lpparam.appInfo.dataDir)
+        HookStatus.init(provider = HookStatus.detectProvider())
+        Log.i(TAG, "Hook框架: ${HookStatus.detectProvider()}")
 
         DexResolver.init(lpparam.appInfo.sourceDir, cl,
             cacheDir = "${lpparam.appInfo.dataDir}/files")
@@ -40,21 +37,5 @@ class HookEntry : IXposedHookLoadPackage {
 
         DexResolver.release()
         Log.i(TAG, "全部Hook完成")
-    }
-
-    private fun detectHookProvider(): String {
-        try {
-            val xposedClass = Class.forName("de.robv.android.xposed.XposedBridge")
-            val tagField = xposedClass.getDeclaredField("TAG")
-            val tag = tagField.get(null) as? String
-            return when {
-                tag?.startsWith("LSPosed") == true -> "LSPosed"
-                tag?.startsWith("EdXposed") == true -> "EdXposed"
-                tag?.startsWith("PineXposed") == true -> "Dreamland"
-                else -> "Legacy Xposed"
-            }
-        } catch (_: Throwable) {
-        }
-        return "Unknown"
     }
 }

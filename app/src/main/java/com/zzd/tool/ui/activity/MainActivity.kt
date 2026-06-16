@@ -70,7 +70,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkModuleStatus(tvStatus: TextView) {
         val isActive = HookStatus.isModuleEnabled()
-        val provider = HookStatus.getHookProviderName()
+        val provider = HookStatus.detectProvider()
         Log.i("ZddTool", "Module status: active=$isActive, provider=$provider")
         tvStatus.text = if (isActive)
             getString(R.string.module_is_activated) + " ($provider)"
