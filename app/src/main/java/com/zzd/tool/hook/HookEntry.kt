@@ -34,16 +34,17 @@ class HookEntry : IXposedHookLoadPackage {
             MessageBadgeHook()
         )
 
+        val provider = detectHookProvider()
+        Log.i(TAG, "Hook框架: $provider")
+
         try {
             val appClass = XposedHelpers.findClass("android.app.Application", null)
             XposedHelpers.findAndHookMethod(appClass, "onCreate",
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         val app = param.thisObject as? Application ?: return
-                        // 先写激活状态，再读设置
-                        writeActivationStatus(app)
+                        writeActivationStatus(app, provider)
                         SettingsManager.initFromContentResolver(app)
-                        Log.i(TAG, "Hook框架: ${detectHookProvider()}")
                         functionalHooks.forEach { it.init(cl) }
                         Log.i(TAG, "全部Hook完成")
                     }
@@ -54,22 +55,45 @@ class HookEntry : IXposedHookLoadPackage {
     }
 
     private fun detectHookProvider(): String {
-        return try {
+        // 方法1: 检查 LSPosed 专属类
+        try {
+            ClassLoader.getSystemClassLoader().loadClass("org.lsposed.lspd.service.LSPosedService")
+            return "LSPosed"
+        } catch (_: Throwable) {}
+
+        // 方法2: 检查 EdXposed 专属类
+        try {
+            ClassLoader.getSystemClassLoader().loadClass("com.swiftshader.edxposed.EdXposed")
+            return "EdXposed"
+        } catch (_: Throwable) {}
+
+        // 方法3: 检查 TAG 字段
+        try {
             val xposedClass = ClassLoader.getSystemClassLoader()
                 .loadClass("de.robv.android.xposed.XposedBridge")
             val tag = xposedClass.getDeclaredField("TAG").get(null) as? String
-            when {
-                tag?.startsWith("LSPosed") == true -> "LSPosed"
-                tag?.startsWith("EdXposed") == true -> "EdXposed"
-                tag?.startsWith("PineXposed") == true -> "Dreamland"
-                else -> "Xposed"
+            if (tag != null) {
+                return when {
+                    tag.contains("LSPosed") -> "LSPosed"
+                    tag.contains("EdXposed") -> "EdXposed"
+                    tag.contains("Pine") -> "Dreamland"
+                    tag.contains("Xposed") -> "Xposed"
+                    else -> tag
+                }
             }
-        } catch (_: Throwable) { "None" }
+        } catch (_: Throwable) {}
+
+        // 方法4: 检查类名是否被混淆（LSPosed 会混淆类名）
+        try {
+            ClassLoader.getSystemClassLoader().loadClass("de.robv.android.xposed.XposedBridge")
+            return "Xposed"
+        } catch (_: Throwable) {}
+
+        return "Unknown"
     }
 
-    private fun writeActivationStatus(app: Application) {
+    private fun writeActivationStatus(app: Application, provider: String) {
         try {
-            val provider = detectHookProvider()
             val uri = android.net.Uri.parse("content://com.zzd.tool.settings/settings")
             app.contentResolver.call(uri, "activate", provider, null)
             Log.i(TAG, "激活状态已写入: $provider")

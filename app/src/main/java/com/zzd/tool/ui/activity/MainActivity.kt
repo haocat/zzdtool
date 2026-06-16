@@ -3,7 +3,6 @@
 package com.zzd.tool.ui.activity
 
 import android.os.Bundle
-import android.util.Log
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -14,6 +13,7 @@ import com.zzd.tool.hook.core.SettingsManager
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var tvStatus: TextView
     private lateinit var switchTablet: SwitchCompat
     private lateinit var switchRecall: SwitchCompat
     private lateinit var switchForward: SwitchCompat
@@ -23,11 +23,9 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val tvStatus = findViewById<TextView>(R.id.main_text_status)
+        tvStatus = findViewById(R.id.main_text_status)
         val tvVersion = findViewById<TextView>(R.id.main_text_version)
-
         tvVersion.text = getString(R.string.module_version, BuildConfig.VERSION_NAME)
-        checkActivationStatus(tvStatus)
 
         switchTablet = findViewById(R.id.switch_tablet_toggle)
         switchRecall = findViewById(R.id.switch_recall_toggle)
@@ -63,6 +61,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        refreshActivationStatus()
+    }
+
     private fun loadAndBindSwitches() {
         val settings = SettingsManager.loadAll(this)
         switchTablet.isChecked = settings["hook_tablet"] ?: true
@@ -84,13 +87,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkActivationStatus(tvStatus: TextView) {
+    private fun refreshActivationStatus() {
         SettingsManager.initFromContentResolver(this)
         val isActive = SettingsManager.isActivated()
         val provider = SettingsManager.getProvider()
         tvStatus.text = if (isActive)
             getString(R.string.module_is_activated) + " ($provider)"
         else
-            getString(R.string.module_not_activated)
+            getString(R.string.module_not_activated) + "\n请先打开 ZZD 后重启"
     }
 }
