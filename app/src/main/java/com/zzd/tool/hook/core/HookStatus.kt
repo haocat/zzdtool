@@ -1,38 +1,20 @@
 package com.zzd.tool.hook.core
 
-import android.content.Context
-import android.net.Uri
-import com.zzd.tool.config.StatusProvider
+import com.tencent.mmkv.MMKV
 
 object HookStatus {
 
-    private const val AUTHORITY = "com.zzd.tool.status"
+    private const val KEY_ACTIVATED = "module_activated"
+    private const val KEY_PROVIDER = "hook_provider"
+
+    private val mmkv by lazy { MMKV.mmkvWithID("zzdtool_status", MMKV.MULTI_PROCESS_MODE) }
 
     fun init(provider: String?) {
-        StatusProvider.setStatus(true, provider)
+        mmkv.encode(KEY_ACTIVATED, true)
+        mmkv.encode(KEY_PROVIDER, provider ?: "Unknown")
     }
 
-    fun isModuleEnabled(context: Context): Boolean {
-        return queryStatus(context)?.firstOrNull() == "true"
-    }
+    fun isModuleEnabled(): Boolean = mmkv.decodeBool(KEY_ACTIVATED, false)
 
-    fun getHookProviderName(context: Context): String {
-        return queryStatus(context)?.getOrNull(1) ?: "None"
-    }
-
-    private fun queryStatus(context: Context): Array<String>? {
-        return try {
-            val uri = Uri.parse("content://$AUTHORITY/check")
-            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    arrayOf(
-                        cursor.getString(cursor.getColumnIndexOrThrow("activated")),
-                        cursor.getString(cursor.getColumnIndexOrThrow("provider"))
-                    )
-                } else null
-            }
-        } catch (_: Exception) {
-            null
-        }
-    }
+    fun getHookProviderName(): String = mmkv.decodeString(KEY_PROVIDER, "None") ?: "None"
 }

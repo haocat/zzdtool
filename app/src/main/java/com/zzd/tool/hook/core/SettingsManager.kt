@@ -1,39 +1,20 @@
 package com.zzd.tool.hook.core
 
 import android.content.Context
-import android.net.Uri
 import android.util.Log
-import org.json.JSONObject
+import com.tencent.mmkv.MMKV
 
 object SettingsManager {
 
     private const val TAG = "ZddTool"
-    private const val AUTHORITY = "com.zzd.tool.settings"
 
-    fun getBoolean(key: String): Boolean {
-        return try {
-            val uri = Uri.parse("content://$AUTHORITY/settings")
-            val cursor = android.app.ActivityThread.currentApplication()
-                ?.contentResolver?.query(uri, null, null, null, null)
-            cursor?.use {
-                if (it.moveToFirst()) {
-                    val json = JSONObject(it.getString(0))
-                    json.optBoolean(key, true)
-                } else true
-            } ?: true
-        } catch (_: Exception) {
-            true
-        }
-    }
+    private val mmkv by lazy { MMKV.mmkvWithID("zzdtool_config", MMKV.MULTI_PROCESS_MODE) }
 
-    fun putBoolean(context: Context, key: String, value: Boolean) {
-        try {
-            context.getSharedPreferences("zzdtool_settings", Context.MODE_PRIVATE)
-                .edit().putBoolean(key, value).commit()
-            Log.i(TAG, "Settings: $key=$value")
-        } catch (e: Exception) {
-            Log.e(TAG, "Settings save failed: ${e.message}")
-        }
+    fun getBoolean(key: String): Boolean = mmkv.decodeBool(key, true)
+
+    fun putBoolean(key: String, value: Boolean) {
+        mmkv.encode(key, value)
+        Log.i(TAG, "Settings: $key=$value")
     }
 
     fun loadAll(): Map<String, Boolean> {
@@ -44,14 +25,9 @@ object SettingsManager {
         return result
     }
 
-    fun resetAll(context: Context) {
-        try {
-            context.getSharedPreferences("zzdtool_settings", Context.MODE_PRIVATE)
-                .edit().clear().commit()
-            Log.i(TAG, "Settings: reset to defaults")
-        } catch (e: Exception) {
-            Log.e(TAG, "Settings reset failed: ${e.message}")
-        }
+    fun resetAll() {
+        HookFeature.entries.forEach { mmkv.remove(it.key) }
+        Log.i(TAG, "Settings: reset to defaults")
     }
 
     fun clearDexKitCache(context: Context) {

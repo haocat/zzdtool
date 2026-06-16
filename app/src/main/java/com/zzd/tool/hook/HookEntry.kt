@@ -13,6 +13,7 @@ class HookEntry : IXposedHookLoadPackage {
     companion object {
         private const val TAG = "ZddTool"
         private const val TARGET = "com.alibaba.taurus.zhejiang"
+        private const val MODULE_PKG = "com.zzd.tool"
     }
 
     private val hooks = listOf(
@@ -27,7 +28,8 @@ class HookEntry : IXposedHookLoadPackage {
         val cl = lpparam.classLoader
         Log.i(TAG, "ZZD已加载")
 
-        MMKV.initialize(lpparam.appInfo.dataDir)
+        // 用模块的 dataDir 初始化 MMKV，确保两个进程读写同一个文件
+        MMKV.initialize("/data/data/$MODULE_PKG/files")
         HookStatus.init(provider = detectHookProvider())
         Log.i(TAG, "Hook框架: ${HookStatus.getHookProviderName()}")
 

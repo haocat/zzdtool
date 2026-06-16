@@ -37,7 +37,7 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<TextView>(R.id.btn_clear_cache).setOnClickListener {
             try {
-                SettingsManager.clearDexKitCache(filesDir)
+                SettingsManager.clearDexKitCache(this)
                 Toast.makeText(this, R.string.cache_cleared, Toast.LENGTH_SHORT).show()
             } catch (_: Exception) {
                 Toast.makeText(this, R.string.cache_clear_failed, Toast.LENGTH_SHORT).show()
@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<TextView>(R.id.btn_reset_settings).setOnClickListener {
             try {
-                SettingsManager.resetAll(this)
+                SettingsManager.resetAll()
                 switchViews.values.forEach { it.setOnCheckedChangeListener(null) }
                 switchViews.forEach { (feature, switch) ->
                     switch.isChecked = feature.defaultEnabled
@@ -63,17 +63,15 @@ class MainActivity : AppCompatActivity() {
         switchViews.forEach { (feature, switch) ->
             switch.isChecked = settings[feature.key] ?: feature.defaultEnabled
             switch.setOnCheckedChangeListener { _, isChecked ->
-                SettingsManager.putBoolean(this, feature.key, isChecked)
+                SettingsManager.putBoolean(feature.key, isChecked)
             }
         }
     }
 
     private fun checkModuleStatus(tvStatus: TextView) {
-        val isActive = HookStatus.isModuleEnabled(this)
-        val provider = HookStatus.getHookProviderName(this)
-
+        val isActive = HookStatus.isModuleEnabled()
+        val provider = HookStatus.getHookProviderName()
         Log.i("ZddTool", "Module status: active=$isActive, provider=$provider")
-
         tvStatus.text = if (isActive)
             getString(R.string.module_is_activated) + " ($provider)"
         else
