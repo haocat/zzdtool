@@ -7,6 +7,7 @@ import com.zzd.tool.hook.core.BaseHook
 import com.zzd.tool.hook.core.DexResolver
 import com.zzd.tool.hook.core.HookFeature
 import com.zzd.tool.hook.core.HookUtils
+import com.zzd.tool.hook.core.SettingsManager
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedHelpers
 import java.text.SimpleDateFormat
@@ -58,7 +59,8 @@ class MessageBadgeHook : BaseHook(HookFeature.BADGE) {
         val message = XposedHelpers.callMethod(param.thisObject, "b", position) as? Any ?: return
         val msgId = XposedHelpers.callMethod(message, "messageId") as? Long ?: return
 
-        val recallType = AntiRecallHook.recalledMsgs[msgId]
+        val recallEnabled = SettingsManager.getBoolean("hook_recall")
+        val recallType = if (recallEnabled) AntiRecallHook.recalledMsgs[msgId] else null
         val displayText = if (recallType != null) {
             if (recallType == AntiRecallHook.RECALL_TYPE_ADMIN ||
                 recallType == AntiRecallHook.RECALL_TYPE_GROUP_OWNER

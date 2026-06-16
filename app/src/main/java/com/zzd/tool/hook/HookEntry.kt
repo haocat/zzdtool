@@ -22,16 +22,11 @@ class HookEntry : IXposedHookLoadPackage {
         val cl = lpparam.classLoader
         Log.i(TAG, "ZZD已加载")
 
-        // 写入激活状态
-        writeActivationStatus(lpparam)
-
         DexResolver.init(lpparam.appInfo.sourceDir, cl,
             cacheDir = "${lpparam.appInfo.dataDir}/files")
 
-        // 设置入口 hook（不依赖 settings）
         SettingEntryHook().init(cl)
 
-        // 其余 hook 需要 settings，延迟到 Application.onCreate 后注册
         val functionalHooks = listOf(
             TabletModeHook(),
             AntiRecallHook(),
@@ -45,6 +40,8 @@ class HookEntry : IXposedHookLoadPackage {
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         val app = param.thisObject as? Application ?: return
+                        // 先写激活状态，再读设置
+                        writeActivationStatus(app)
                         SettingsManager.initFromContentResolver(app)
                         Log.i(TAG, "Hook框架: ${detectHookProvider()}")
                         functionalHooks.forEach { it.init(cl) }
@@ -70,14 +67,11 @@ class HookEntry : IXposedHookLoadPackage {
         } catch (_: Throwable) { "None" }
     }
 
-    private fun writeActivationStatus(lpparam: XC_LoadPackage.LoadPackageParam) {
+    private fun writeActivationStatus(app: Application) {
         try {
             val provider = detectHookProvider()
-            val appClass = Class.forName("android.app.ActivityThread")
-            val currentApp = appClass.getDeclaredMethod("currentApplication").invoke(null)
-            val ctx = currentApp as? android.content.Context ?: return
             val uri = android.net.Uri.parse("content://com.zzd.tool.settings/settings")
-            ctx.contentResolver.call(uri, "activate", provider, null)
+            app.contentResolver.call(uri, "activate", provider, null)
             Log.i(TAG, "激活状态已写入: $provider")
         } catch (e: Throwable) {
             Log.w(TAG, "写入激活状态失败: ${e.message}")
