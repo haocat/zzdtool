@@ -24,7 +24,7 @@ class MainActivity : AppCompatActivity() {
         val tvVersion = findViewById<TextView>(R.id.main_text_version)
 
         tvVersion.text = getString(R.string.module_version, BuildConfig.VERSION_NAME)
-        tvStatus.text = getString(R.string.module_subtitle)
+        checkModuleStatus(tvStatus)
 
         switchViews[HookFeature.TABLET] = findViewById(R.id.switch_tablet_toggle)
         switchViews[HookFeature.RECALL] = findViewById(R.id.switch_recall_toggle)
@@ -64,5 +64,18 @@ class MainActivity : AppCompatActivity() {
                 SettingsManager.putBoolean(feature.key, isChecked)
             }
         }
+    }
+
+    private fun checkModuleStatus(tvStatus: TextView) {
+        val isActive = try {
+            Class.forName("de.robv.android.xposed.XposedBridge")
+            true
+        } catch (_: ClassNotFoundException) {
+            false
+        }
+        tvStatus.text = if (isActive)
+            getString(R.string.module_is_activated)
+        else
+            getString(R.string.module_not_activated)
     }
 }

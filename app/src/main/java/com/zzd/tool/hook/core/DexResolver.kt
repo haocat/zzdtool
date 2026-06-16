@@ -115,7 +115,8 @@ object DexResolver {
 
     /** 通过字符串特征找方法名（不依赖类名、方法名） */
     fun findMethodNameByStrings(vararg strings: String): String? {
-        val key = "mstr:" + strings.joinToString("|")
+        val key = "mstr:${strings.joinToString("|")}"
+        if (!ensureBridge()) return null
         val b = bridge ?: return null
         return try {
             b.findMethod {
