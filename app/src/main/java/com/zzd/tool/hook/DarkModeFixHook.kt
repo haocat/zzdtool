@@ -11,74 +11,41 @@ class DarkModeFixHook : BaseHook(HookFeature.DARK_MODE) {
 
     companion object {
         private const val TAG = "ZddTool"
-
-        // 右气泡资源名 → 左气泡资源名
-        private val rightToLeftMap = mapOf(
-            "im_chatto_bg_normal_white_mode_v2" to "im_chatfrom_bg_normal_white_mode_v2",
-            "im_chatto_bg_pressed_white_mode_v2" to "im_chatfrom_bg_pressed_white_mode_v2",
-            "im_chatto_bg_normal_gray_mode_v2" to "im_chatfrom_bg_normal_gray_mode_v2",
-            "im_chatto_bg_pressed_gray_mode_v2" to "im_chatfrom_bg_pressed_gray_mode_v2",
-            "im_chatto_bg_normal_white_mode" to "im_chatfrom_bg_normal_white_mode",
-            "im_chatto_bg_pressed_white_mode" to "im_chatfrom_bg_pressed_white_mode",
-            "im_chatto_bg_normal_gray_mode" to "im_chatfrom_bg_normal_gray_mode",
-            "im_chatto_bg_pressed_gray_mode" to "im_chatfrom_bg_pressed_gray_mode",
-        )
     }
 
-    private var resIdCache = HashMap<Int, Int>()
     private var leftBgNormalId = 0
     private var leftBgPressedId = 0
 
     override fun onInit(cl: ClassLoader): Boolean {
         if (!isEnabled()) return true
 
-        buildResIdMap(cl)
-
-        // 1. hook awj.M() — 回复消息气泡
-        // awj = BaseReplyMsgViewHolder, M() 设置 this.o 的背景
+        // 获取左气泡资源 ID（从 hqd$e，和 gwf 用的同一套）
         try {
-            val awjClass = XposedHelpers.findClass("taurus.awj", cl)
-            XposedHelpers.findAndHookMethod(awjClass, "M",
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        if (!isEnabled()) return
-                        try {
-                            val view = XposedHelpers.getObjectField(param.thisObject, "o") as? View ?: return
-                            val ctx = view.context ?: return
-                            view.setBackgroundResource(leftBgNormalId)
-                        } catch (e: Throwable) {
-                            Log.w(TAG, "awj.M hook failed: ${e.message}")
-                        }
-                    }
-                })
-            Log.i(TAG, "✔ awj.M() hook 完成")
+            val hqdE = XposedHelpers.findClass("taurus.hqd\$e", cl)
+            leftBgNormalId = XposedHelpers.getStaticIntField(hqdE, "im_chatfrom_bg_normal")
+            leftBgPressedId = XposedHelpers.getStaticIntField(hqdE, "im_chatfrom_bg_pressed")
+            Log.i(TAG, "左气泡资源: normal=0x${Integer.toHexString(leftBgNormalId)}, pressed=0x${Integer.toHexString(leftBgPressedId)}")
         } catch (e: Throwable) {
-            Log.w(TAG, "awj.M() hook 失败: ${e.message}")
+            Log.e(TAG, "获取左气泡资源失败: ${e.message}")
+            return false
         }
 
-        // 2. hook bez 类 — 语音消息气泡
-        // bez = UserVoiceToViewHolder, 继承 bfa → axw → avz
-        try {
-            val bezClass = XposedHelpers.findClass("taurus.bez", cl)
-            XposedHelpers.findAndHookMethod(bezClass, "M",
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        if (!isEnabled()) return
-                        try {
-                            val view = XposedHelpers.getObjectField(param.thisObject, "o") as? View ?: return
-                            view.setBackgroundResource(leftBgNormalId)
-                        } catch (e: Throwable) {
-                            Log.w(TAG, "bez.M hook failed: ${e.message}")
-                        }
-                    }
-                })
-            Log.i(TAG, "✔ bez.M() hook 完成")
-        } catch (e: Throwable) {
-            Log.w(TAG, "bez.M() hook 失败: ${e.message}")
+        if (leftBgNormalId == 0 || leftBgPressedId == 0) {
+            Log.e(TAG, "左气泡资源 ID 为 0")
+            return false
         }
 
-        // 3. hook awv.a(boolean, boolean) — ChatBubbleUtils
-        // 强制右气泡走左气泡逻辑
+        // 1. hook gwf.M() — 文本消息按压态
+        hookViewHolderM(cl, "taurus.gwf", "ChatToTextMessageViewHolder")
+
+        // 2. hook awj.M() — 回复消息（BaseReplyMsgViewHolder）
+        hookViewHolderM(cl, "taurus.awj", "BaseReplyMsgViewHolder")
+
+        // 3. hook bez — 语音消息（UserVoiceToViewHolder）
+        // bez 没有自己的 M()，需要 hook 父类
+        hookViewHolderM(cl, "taurus.bfa", "UserVoiceToViewHolder父类")
+
+        // 4. hook awv.a() — ChatBubbleUtils 兜底
         try {
             val bubbleUtils = XposedHelpers.findClass("taurus.awv", cl)
             XposedHelpers.findAndHookMethod(bubbleUtils, "a",
@@ -98,30 +65,27 @@ class DarkModeFixHook : BaseHook(HookFeature.DARK_MODE) {
         return true
     }
 
-    private fun buildResIdMap(cl: ClassLoader) {
+    private fun hookViewHolderM(cl: ClassLoader, className: String, desc: String) {
         try {
-            val resClass = XposedHelpers.findClass("taurus.auy\$e", cl)
-            for ((rightName, leftName) in rightToLeftMap) {
-                try {
-                    val rightId = resClass.getDeclaredField(rightName).getInt(null)
-                    val leftId = resClass.getDeclaredField(leftName).getInt(null)
-                    if (rightId != 0 && leftId != 0) {
-                        resIdCache[rightId] = leftId
+            val clazz = XposedHelpers.findClass(className, cl)
+            XposedHelpers.findAndHookMethod(clazz, "M",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        if (!isEnabled()) return
+                        try {
+                            // awj 把背景 View 存在字段 "o" 里
+                            val view = XposedHelpers.getObjectField(param.thisObject, "o") as? View
+                            if (view != null) {
+                                view.setBackgroundResource(leftBgNormalId)
+                            }
+                        } catch (e: Throwable) {
+                            Log.w(TAG, "$desc.M hook failed: ${e.message}")
+                        }
                     }
-                } catch (_: Throwable) {}
-            }
-            // 保存左气泡普通/按压态资源 ID
-            leftBgNormalId = XposedHelpers.getStaticIntField(resClass, "im_chatfrom_bg_normal_white_mode_v2")
-            leftBgPressedId = XposedHelpers.getStaticIntField(resClass, "im_chatfrom_bg_pressed_white_mode_v2")
-            if (leftBgNormalId == 0) {
-                leftBgNormalId = XposedHelpers.getStaticIntField(resClass, "im_chatfrom_bg_normal_white_mode")
-            }
-            if (leftBgPressedId == 0) {
-                leftBgPressedId = XposedHelpers.getStaticIntField(resClass, "im_chatfrom_bg_pressed_white_mode")
-            }
-            Log.i(TAG, "深色模式: leftBgNormal=0x${Integer.toHexString(leftBgNormalId)}, leftBgPressed=0x${Integer.toHexString(leftBgPressedId)}")
+                })
+            Log.i(TAG, "✔ $desc.M() hook 完成")
         } catch (e: Throwable) {
-            Log.e(TAG, "构建资源映射失败: ${e.message}")
+            Log.w(TAG, "$desc.M() hook 失败: ${e.message}")
         }
     }
 }
