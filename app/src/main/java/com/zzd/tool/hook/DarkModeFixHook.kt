@@ -17,9 +17,18 @@ class DarkModeFixHook : BaseHook(HookFeature.DARK_MODE) {
     override fun onInit(cl: ClassLoader): Boolean {
         if (!isEnabled()) return true
 
-        Log.i(TAG, "=== 深色模式调试：开始监听所有背景设置 ===")
+        // 1. gwf (ChatToTextMessageViewHolder) — 文本消息
+        hookViewHolderField(cl, "taurus.gwf", "P", "ab", false, "文本常态")
+        hookViewHolderField(cl, "taurus.gwf", "M", "ab", true, "文本按压")
 
-        // 监听所有 View 的 setBackgroundResource 调用
+        // 2. gvu (ChatToReplyMsgViewHolder) — 回复消息
+        hookViewHolderDrawable(cl, "taurus.gvu", "M", "Z", "ap", "回复消息")
+
+        // 3. gue (ChatToAudioMessageViewHolder) — 语音消息
+        hookViewHolderFindViewById(cl, "taurus.gue", "K", "voice_play_view_container", false, "语音常态")
+        hookViewHolderFindViewById(cl, "taurus.gue", "M", "voice_play_view_container", true, "语音按压")
+
+        // 4. View.setBackgroundResource — 拦截所有背景设置
         XposedHelpers.findAndHookMethod(
             View::class.java, "setBackgroundResource", Int::class.java,
             object : XC_MethodHook() {
@@ -28,69 +37,86 @@ class DarkModeFixHook : BaseHook(HookFeature.DARK_MODE) {
                     val resId = param.args[0] as? Int ?: return
                     val view = param.thisObject as? View ?: return
                     val ctx = view.context ?: return
-                    val pkg = ctx.packageName ?: return
-                    if (pkg != "com.alibaba.taurus.zhejiang") return
+                    if (ctx.packageName != "com.alibaba.taurus.zhejiang") return
 
-                    // 只打印右气泡相关的资源
                     val resName = try { ctx.resources.getResourceEntryName(resId) } catch (_: Throwable) { "?" }
-                    if (resName.contains("chatto") || resName.contains("chatfrom")) {
-                        val stackTrace = Throwable().stackTrace.take(6).joinToString("\n") { "    ${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }
-                        Log.d(TAG, "setBackgroundResource: $resName(0x${Integer.toHexString(resId)}) view=${view.javaClass.simpleName}\n$stackTrace")
+                    if (resName.startsWith("im_chatto_bg_")) {
+                        try {
+                            val bubbleUtils = XposedHelpers.findClass("taurus.awv", ctx.classLoader)
+                            val isPressed = resName.contains("pressed")
+                            val leftResId = XposedHelpers.callStaticMethod(bubbleUtils, "a", false, isPressed) as Int
+                            param.args[0] = leftResId
+                            Log.d(TAG, "替换: $resName → 0x${Integer.toHexString(leftResId)}")
+                        } catch (_: Throwable) {}
                     }
                 }
             })
 
-        // 监听所有 View 的 setBackground 调用
-        XposedHelpers.findAndHookMethod(
-            View::class.java, "setBackground", Drawable::class.java,
-            object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    if (!isEnabled()) return
-                    val drawable = param.args[0] as? Drawable ?: return
-                    val view = param.thisObject as? View ?: return
-                    val ctx = view.context ?: return
-                    val pkg = ctx.packageName ?: return
-                    if (pkg != "com.alibaba.taurus.zhejiang") return
-
-                    val drawableName = drawable.javaClass.name
-                    if (drawableName.contains("GradientDrawable") || drawableName.contains("ColorDrawable")) {
-                        val stackTrace = Throwable().stackTrace.take(6).joinToString("\n") { "    ${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }
-                        Log.d(TAG, "setBackground: ${drawableName.substringAfterLast('.')} view=${view.javaClass.simpleName}\n$stackTrace")
-                    }
-                }
-            })
-
-        // 监听 gue 的 K() 和 M()
-        hookMethod(cl, "taurus.gue", "K", "语音K(常态)")
-        hookMethod(cl, "taurus.gue", "M", "语音M(按压)")
-
-        // 监听 gvt/gvu 的 M()
-        hookMethod(cl, "taurus.gvt", "M", "回复gvt.M")
-        hookMethod(cl, "taurus.gvu", "M", "回复gvu.M")
-
-        // 监听 gwf 的 P() 和 M()
-        hookMethod(cl, "taurus.gwf", "P", "文本gwf.P")
-        hookMethod(cl, "taurus.gwf", "M", "文本gwf.M")
-
-        Log.i(TAG, "=== 深色模式调试：监听完成，等待触发 ===")
+        Log.i(TAG, "✔ ColorOS深色模式修复完成")
         return true
     }
 
-    private fun hookMethod(cl: ClassLoader, className: String, methodName: String, desc: String) {
+    private fun hookViewHolderField(cl: ClassLoader, className: String, methodName: String,
+                                     fieldName: String, isPressed: Boolean, desc: String) {
         try {
             val clazz = XposedHelpers.findClass(className, cl)
+            val bubbleUtils = XposedHelpers.findClass("taurus.awv", cl)
             XposedHelpers.findAndHookMethod(clazz, methodName,
                 object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        Log.d(TAG, ">>> $desc 被调用")
-                    }
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        Log.d(TAG, "<<< $desc 完成")
+                        if (!isEnabled()) return
+                        try {
+                            val view = XposedHelpers.getObjectField(param.thisObject, fieldName) as? View ?: return
+                            val resId = XposedHelpers.callStaticMethod(bubbleUtils, "a", false, isPressed) as Int
+                            view.setBackgroundResource(resId)
+                        } catch (e: Throwable) { Log.w(TAG, "$desc: ${e.message}") }
                     }
                 })
             Log.i(TAG, "✔ $desc hook 完成")
-        } catch (e: Throwable) {
-            Log.w(TAG, "$desc hook 失败: ${e.message}")
-        }
+        } catch (e: Throwable) { Log.w(TAG, "$desc hook 失败: ${e.message}") }
+    }
+
+    private fun hookViewHolderDrawable(cl: ClassLoader, className: String, methodName: String,
+                                        viewField: String, drawableField: String, desc: String) {
+        try {
+            val clazz = XposedHelpers.findClass(className, cl)
+            val bubbleUtils = XposedHelpers.findClass("taurus.awv", cl)
+            XposedHelpers.findAndHookMethod(clazz, methodName,
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        if (!isEnabled()) return
+                        try {
+                            val view = XposedHelpers.getObjectField(param.thisObject, viewField) as? View ?: return
+                            val ctx = view.context ?: return
+                            val resId = XposedHelpers.callStaticMethod(bubbleUtils, "a", false, false) as Int
+                            XposedHelpers.setObjectField(param.thisObject, drawableField, ctx.getDrawable(resId))
+                        } catch (e: Throwable) { Log.w(TAG, "$desc: ${e.message}") }
+                    }
+                })
+            Log.i(TAG, "✔ $desc hook 完成")
+        } catch (e: Throwable) { Log.w(TAG, "$desc hook 失败: ${e.message}") }
+    }
+
+    private fun hookViewHolderFindViewById(cl: ClassLoader, className: String, methodName: String,
+                                            resIdName: String, isPressed: Boolean, desc: String) {
+        try {
+            val clazz = XposedHelpers.findClass(className, cl)
+            val resIdField = XposedHelpers.findClass("taurus.hqd\$f", cl)
+            val containerResId = XposedHelpers.getStaticIntField(resIdField, resIdName)
+            val bubbleUtils = XposedHelpers.findClass("taurus.awv", cl)
+            XposedHelpers.findAndHookMethod(clazz, methodName,
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        if (!isEnabled()) return
+                        try {
+                            val itemView = XposedHelpers.getObjectField(param.thisObject, "o") as? View ?: return
+                            val container = itemView.findViewById<View>(containerResId) ?: return
+                            val resId = XposedHelpers.callStaticMethod(bubbleUtils, "a", false, isPressed) as Int
+                            container.setBackgroundResource(resId)
+                        } catch (e: Throwable) { Log.w(TAG, "$desc: ${e.message}") }
+                    }
+                })
+            Log.i(TAG, "✔ $desc hook 完成")
+        } catch (e: Throwable) { Log.w(TAG, "$desc hook 失败: ${e.message}") }
     }
 }
