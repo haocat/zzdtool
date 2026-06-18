@@ -1,6 +1,6 @@
 package com.zzd.tool.hook
 
-import android.graphics.drawable.Drawable
+import android.app.Activity
 import android.util.Log
 import android.view.View
 import com.zzd.tool.hook.core.BaseHook
@@ -51,6 +51,48 @@ class DarkModeFixHook : BaseHook(HookFeature.DARK_MODE) {
                     }
                 }
             })
+
+        // 5. gvu (ChatToReplyMsgViewHolder) — 初始背景修复 (b() 方法用 chatto_bg 天蓝色)
+        try {
+            val gvuClass = XposedHelpers.findClass("taurus.gvu", cl)
+            val bubbleUtils = XposedHelpers.findClass("taurus.awv", cl)
+            XposedHelpers.findAndHookMethod(gvuClass, "b",
+                Activity::class.java,
+                XposedHelpers.findClass("com.alibaba.wukong.im.Message", cl),
+                Int::class.javaPrimitiveType,
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        if (!isEnabled()) return
+                        try {
+                            val view = XposedHelpers.getObjectField(param.thisObject, "Z") as? View ?: return
+                            val resId = XposedHelpers.callStaticMethod(bubbleUtils, "a", false, false) as Int
+                            view.setBackgroundResource(resId)
+                        } catch (e: Throwable) { Log.w(TAG, "回复初始: ${e.message}") }
+                    }
+                })
+            Log.i(TAG, "✔ 回复消息初始背景 hook 完成")
+        } catch (e: Throwable) { Log.w(TAG, "回复消息初始背景 hook 失败: ${e.message}") }
+
+        // 6. gue (ChatToAudioMessageViewHolder) — 初始背景修复 (XML 布局中的初始背景)
+        try {
+            val gucClass = XposedHelpers.findClass("taurus.guc", cl)
+            val bubbleUtils = XposedHelpers.findClass("taurus.awv", cl)
+            XposedHelpers.findAndHookMethod(gucClass, "a",
+                Activity::class.java,
+                View::class.java,
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        if (!isEnabled()) return
+                        if (param.thisObject.javaClass.name != "taurus.gue") return
+                        try {
+                            val container = XposedHelpers.getObjectField(param.thisObject, "ae") as? View ?: return
+                            val resId = XposedHelpers.callStaticMethod(bubbleUtils, "a", false, false) as Int
+                            container.setBackgroundResource(resId)
+                        } catch (e: Throwable) { Log.w(TAG, "语音初始: ${e.message}") }
+                    }
+                })
+            Log.i(TAG, "✔ 语音消息初始背景 hook 完成")
+        } catch (e: Throwable) { Log.w(TAG, "语音消息初始背景 hook 失败: ${e.message}") }
 
         Log.i(TAG, "✔ ColorOS深色模式修复完成")
         return true
