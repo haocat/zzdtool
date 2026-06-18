@@ -50,6 +50,32 @@ class DarkModeFixHook : BaseHook(HookFeature.DARK_MODE) {
             Log.w(TAG, "awv.a() hook 失败: ${e.message}")
         }
 
+        // 5. hook View.setBackgroundResource — 拦截所有背景设置（包括 XML 初始背景）
+        try {
+            XposedHelpers.findAndHookMethod(
+                View::class.java, "setBackgroundResource", Int::class.java,
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        if (!isEnabled()) return
+                        val resId = param.args[0] as? Int ?: return
+                        // 右气泡资源 ID 范围: 0x7f0808a5 - 0x7f0808b0 (im_chatto_bg_*)
+                        if (resId in 0x7f0808a5..0x7f0808b0) {
+                            try {
+                                val ctx = (param.thisObject as? View)?.context ?: return
+                                val bubbleUtils = XposedHelpers.findClass("taurus.awv", ctx.classLoader)
+                                val isPressed = resId in 0x7f0808aa..0x7f0808ae || resId == 0x7f0808b0
+                                val leftResId = XposedHelpers.callStaticMethod(bubbleUtils, "a", false, isPressed) as Int
+                                param.args[0] = leftResId
+                                Log.d(TAG, "setBackgroundResource: 0x${Integer.toHexString(resId)} → 0x${Integer.toHexString(leftResId)}")
+                            } catch (_: Throwable) {}
+                        }
+                    }
+                })
+            Log.i(TAG, "✔ View.setBackgroundResource hook 完成")
+        } catch (e: Throwable) {
+            Log.w(TAG, "View.setBackgroundResource hook 失败: ${e.message}")
+        }
+
         Log.i(TAG, "✔ ColorOS深色模式修复: 完成")
         return true
     }
