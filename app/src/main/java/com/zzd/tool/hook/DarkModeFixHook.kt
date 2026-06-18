@@ -76,6 +76,34 @@ class DarkModeFixHook : BaseHook(HookFeature.DARK_MODE) {
             Log.w(TAG, "View.setBackgroundResource hook 失败: ${e.message}")
         }
 
+        // 6. hook View.setBackground(Drawable) — 拦截 Drawable 背景设置
+        try {
+            XposedHelpers.findAndHookMethod(
+                View::class.java, "setBackground",
+                android.graphics.drawable.Drawable::class.java,
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        if (!isEnabled()) return
+                        val drawable = param.args[0] as? android.graphics.drawable.Drawable ?: return
+                        val view = param.thisObject as? View ?: return
+                        val ctx = view.context ?: return
+                        val cl = ctx.classLoader ?: return
+                        // 检查是否是右气泡的 GradientDrawable
+                        val drawableName = drawable.javaClass.name
+                        if (drawableName.contains("GradientDrawable")) {
+                            try {
+                                val bubbleUtils = XposedHelpers.findClass("taurus.awv", cl)
+                                val resId = XposedHelpers.callStaticMethod(bubbleUtils, "a", false, false) as Int
+                                param.args[0] = ctx.getDrawable(resId)
+                            } catch (_: Throwable) {}
+                        }
+                    }
+                })
+            Log.i(TAG, "✔ View.setBackground hook 完成")
+        } catch (e: Throwable) {
+            Log.w(TAG, "View.setBackground hook 失败: ${e.message}")
+        }
+
         Log.i(TAG, "✔ ColorOS深色模式修复: 完成")
         return true
     }
