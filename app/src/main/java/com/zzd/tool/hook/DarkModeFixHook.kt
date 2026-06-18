@@ -33,8 +33,11 @@ class DarkModeFixHook : BaseHook(HookFeature.DARK_MODE) {
         hookViewHolder(cl, "taurus.gwf", "P", "ab", leftBgNormalId, "文本常态")
         hookViewHolder(cl, "taurus.gwf", "M", "ab", leftBgPressedId, "文本按压")
 
-        // 2. awj (BaseReplyMsgViewHolder) — 回复消息
-        hookViewHolder(cl, "taurus.awj", "M", "o", leftBgNormalId, "回复消息")
+        // 2. awj (BaseReplyMsgViewHolder) — 回复消息（部分）
+        hookViewHolder(cl, "taurus.awj", "M", "o", leftBgNormalId, "回复消息-awj")
+
+        // 2b. gvt (ChatReplyMsgViewHolder) — 回复消息（主要）
+        hookViewHolder(cl, "taurus.gvt", "M", "o", leftBgNormalId, "回复消息-gvt")
 
         // 3. gue (ChatToAudioMessageViewHolder) — 语音消息
         //    通过 findViewById 找 voice_play_view_container
