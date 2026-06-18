@@ -32,7 +32,7 @@ class MessageBadgeHook : BaseHook(HookFeature.BADGE) {
 
     override fun onInit(cl: ClassLoader): Boolean {
         val target = DexResolver.findClassByStrings("getItemViewType position: ")
-            ?: findClassByFallback(cl, "taurus.awv")
+            ?: findClassByFallback(cl, "taurus.aww")
             ?: run {
                 Log.e(TAG, "✘ viewHolder: 找不到类")
                 return false

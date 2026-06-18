@@ -32,7 +32,8 @@ class HookEntry : IXposedHookLoadPackage {
             TabletModeHook(),
             AntiRecallHook(),
             ForwardUnlockHook(),
-            MessageBadgeHook()
+            MessageBadgeHook(),
+            DarkModeFixHook()
         )
 
         val provider = detectHookProvider()

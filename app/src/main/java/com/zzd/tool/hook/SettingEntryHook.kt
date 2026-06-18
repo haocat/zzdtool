@@ -93,7 +93,7 @@ class SettingEntryHook : BaseHook() {
                 typeface = Typeface.DEFAULT_BOLD
             })
             addView(TextView(activity).apply {
-                text = "平板模式 · 防撤回 · 转发解锁 · 消息徽章"
+                text = "平板模式 · 防撤回 · 转发解锁 · 深色修复"
                 setTextColor(Color.parseColor("#666666"))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
                 setPadding(0, dp(2), 0, 0)

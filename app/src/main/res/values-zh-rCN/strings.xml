@@ -13,6 +13,7 @@
     <string name="feature_recall">消息防撤回</string>
     <string name="feature_forward">解除转发限制</string>
     <string name="feature_badge">右下角信息</string>
+    <string name="feature_dark_mode">强制深色模式</string>
     <string name="btn_clear_cache">清除缓存</string>
     <string name="btn_reset_settings">重置所有设置</string>
     <string name="cache_cleared">缓存已清除</string>

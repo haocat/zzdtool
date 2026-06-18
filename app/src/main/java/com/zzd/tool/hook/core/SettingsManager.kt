@@ -24,6 +24,7 @@ object SettingsManager {
                     settings["hook_recall"] = json.optBoolean("hook_recall", true)
                     settings["hook_forward"] = json.optBoolean("hook_forward", true)
                     settings["hook_badge"] = json.optBoolean("hook_badge", true)
+                    settings["hook_dark_mode"] = json.optBoolean("hook_dark_mode", false)
                     activated = json.optBoolean("activated", false)
                     providerName = json.optString("provider", "None")
                     Log.i(TAG, "Settings: $settings")
@@ -49,7 +50,8 @@ object SettingsManager {
             "hook_tablet" to kv.decodeBool("hook_tablet", true),
             "hook_recall" to kv.decodeBool("hook_recall", true),
             "hook_forward" to kv.decodeBool("hook_forward", true),
-            "hook_badge" to kv.decodeBool("hook_badge", true)
+            "hook_badge" to kv.decodeBool("hook_badge", true),
+            "hook_dark_mode" to kv.decodeBool("hook_dark_mode", false)
         )
     }
 
@@ -84,6 +86,7 @@ object SettingsManager {
         "hook_tablet" to true,
         "hook_recall" to true,
         "hook_forward" to true,
-        "hook_badge" to true
+        "hook_badge" to true,
+        "hook_dark_mode" to false
     )
 }

@@ -45,6 +45,7 @@ class SettingsProvider : ContentProvider() {
                 put("hook_recall", mmkv?.decodeBool("hook_recall", true) ?: true)
                 put("hook_forward", mmkv?.decodeBool("hook_forward", true) ?: true)
                 put("hook_badge", mmkv?.decodeBool("hook_badge", true) ?: true)
+                put("hook_dark_mode", mmkv?.decodeBool("hook_dark_mode", false) ?: false)
                 put("activated", mmkv?.decodeBool("activated", false) ?: false)
                 put("provider", mmkv?.decodeString("provider") ?: "None")
             }
@@ -52,6 +53,7 @@ class SettingsProvider : ContentProvider() {
             org.json.JSONObject().apply {
                 put("hook_tablet", true); put("hook_recall", true)
                 put("hook_forward", true); put("hook_badge", true)
+                put("hook_dark_mode", false)
                 put("activated", false); put("provider", "None")
             }
         }

@@ -19,6 +19,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var switchRecall: SwitchCompat
     private lateinit var switchForward: SwitchCompat
     private lateinit var switchBadge: SwitchCompat
+    private lateinit var switchDarkMode: SwitchCompat
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,6 +35,7 @@ class MainActivity : AppCompatActivity() {
         switchRecall = findViewById(R.id.switch_recall_toggle)
         switchForward = findViewById(R.id.switch_forward_toggle)
         switchBadge = findViewById(R.id.switch_badge_toggle)
+        switchDarkMode = findViewById(R.id.switch_dark_mode_toggle)
 
         loadAndBindSwitches()
 
@@ -53,10 +55,12 @@ class MainActivity : AppCompatActivity() {
                 switchRecall.setOnCheckedChangeListener(null)
                 switchForward.setOnCheckedChangeListener(null)
                 switchBadge.setOnCheckedChangeListener(null)
+                switchDarkMode.setOnCheckedChangeListener(null)
                 switchTablet.isChecked = true
                 switchRecall.isChecked = true
                 switchForward.isChecked = true
                 switchBadge.isChecked = true
+                switchDarkMode.isChecked = false
                 Toast.makeText(this, R.string.settings_reset, Toast.LENGTH_SHORT).show()
             } catch (_: Exception) {
                 Toast.makeText(this, R.string.settings_reset_failed, Toast.LENGTH_SHORT).show()
@@ -75,6 +79,7 @@ class MainActivity : AppCompatActivity() {
         switchRecall.isChecked = settings["hook_recall"] ?: true
         switchForward.isChecked = settings["hook_forward"] ?: true
         switchBadge.isChecked = settings["hook_badge"] ?: true
+        switchDarkMode.isChecked = settings["hook_dark_mode"] ?: false
 
         switchTablet.setOnCheckedChangeListener { _, isChecked ->
             SettingsManager.putBoolean(this, "hook_tablet", isChecked)
@@ -87,6 +92,9 @@ class MainActivity : AppCompatActivity() {
         }
         switchBadge.setOnCheckedChangeListener { _, isChecked ->
             SettingsManager.putBoolean(this, "hook_badge", isChecked)
+        }
+        switchDarkMode.setOnCheckedChangeListener { _, isChecked ->
+            SettingsManager.putBoolean(this, "hook_dark_mode", isChecked)
         }
     }
 
