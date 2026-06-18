@@ -36,9 +36,10 @@ class DarkModeFixHook : BaseHook(HookFeature.DARK_MODE) {
         // 2. awj (BaseReplyMsgViewHolder) — 回复消息
         hookViewHolder(cl, "taurus.awj", "M", "o", leftBgNormalId, "回复消息")
 
-        // 3. bez (UserVoiceToViewHolder) — 语音消息
-        hookViewHolder(cl, "taurus.bez", "K", "ab", leftBgPressedId, "语音按压")
-        hookViewHolder(cl, "taurus.bez", "L", "ab", leftBgNormalId, "语音常态")
+        // 3. gue (ChatToAudioMessageViewHolder) — 语音消息
+        //    通过 findViewById 找 voice_play_view_container
+        hookViewHolderFindByResId(cl, "taurus.gue", "K", "voice_play_view_container", leftBgPressedId, "语音按压")
+        hookViewHolderFindByResId(cl, "taurus.gue", "M", "voice_play_view_container", leftBgNormalId, "语音常态")
 
         // 4. awv.a() — ChatBubbleUtils 兜底
         try {
@@ -82,6 +83,35 @@ class DarkModeFixHook : BaseHook(HookFeature.DARK_MODE) {
                     }
                 })
             Log.i(TAG, "✔ $className.$methodName() [$fieldName] hook 完成")
+        } catch (e: Throwable) {
+            Log.w(TAG, "$className.$methodName() hook 失败: ${e.message}")
+        }
+    }
+
+    private fun hookViewHolderFindByResId(cl: ClassLoader, className: String, methodName: String,
+                                            resIdName: String, resId: Int, desc: String) {
+        try {
+            val clazz = XposedHelpers.findClass(className, cl)
+            val resIdField = XposedHelpers.findClass("taurus.hqd\$f", cl)
+            val containerResId = XposedHelpers.getStaticIntField(resIdField, resIdName)
+
+            XposedHelpers.findAndHookMethod(clazz, methodName,
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        if (!isEnabled()) return
+                        try {
+                            val itemView = XposedHelpers.getObjectField(param.thisObject, "o") as? View ?: return
+                            val container = itemView.findViewById<View>(containerResId)
+                            if (container != null) {
+                                container.setBackgroundResource(resId)
+                                Log.d(TAG, "$desc: setResource(0x${Integer.toHexString(resId)})")
+                            }
+                        } catch (e: Throwable) {
+                            Log.w(TAG, "$desc failed: ${e.message}")
+                        }
+                    }
+                })
+            Log.i(TAG, "✔ $className.$methodName() [$resIdName] hook 完成")
         } catch (e: Throwable) {
             Log.w(TAG, "$className.$methodName() hook 失败: ${e.message}")
         }
