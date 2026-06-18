@@ -22,8 +22,12 @@ class DarkModeFixHook : BaseHook(HookFeature.DARK_MODE) {
         hookViewHolderField(cl, "taurus.gwf", "M", "ab", true, "文本按压")
 
         // 2. gvt (ChatReplyMsgViewHolder) — 回复消息
-        //    字段 "o" (View) + 抓取 "at" Drawable
-        hookViewHolderAt(cl, "taurus.gvt", "M", "回复消息")
+        //    字段 "Z" (View) + "ap" (GradientDrawable)
+        hookViewHolderDrawable(cl, "taurus.gvt", "M", "Z", "ap", "回复消息-gvt")
+
+        // 2b. gvu (ChatToReplyMsgViewHolder) — 回复消息（右气泡）
+        //    继承 gvt，同样用 "Z" 和 "ap"
+        hookViewHolderDrawable(cl, "taurus.gvu", "M", "Z", "ap", "回复消息-gvu")
 
         // 3. gue (ChatToAudioMessageViewHolder) — 语音消息
         //    通过 findViewById 找 voice_play_view_container
@@ -110,8 +114,9 @@ class DarkModeFixHook : BaseHook(HookFeature.DARK_MODE) {
         }
     }
 
-    // 替换 at 字段的 Drawable（gvt 用）
-    private fun hookViewHolderAt(cl: ClassLoader, className: String, methodName: String, desc: String) {
+    // 替换 Drawable 字段（gvt/gvu 用）
+    private fun hookViewHolderDrawable(cl: ClassLoader, className: String, methodName: String,
+                                        viewField: String, drawableField: String, desc: String) {
         try {
             val clazz = XposedHelpers.findClass(className, cl)
             val bubbleUtils = XposedHelpers.findClass("taurus.awv", cl)
@@ -121,18 +126,17 @@ class DarkModeFixHook : BaseHook(HookFeature.DARK_MODE) {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         if (!isEnabled()) return
                         try {
-                            val itemView = XposedHelpers.getObjectField(param.thisObject, "o") as? View ?: return
-                            val ctx = itemView.context ?: return
-                            // 替换 at Drawable 为正确的左气泡 Drawable
+                            val view = XposedHelpers.getObjectField(param.thisObject, viewField) as? View ?: return
+                            val ctx = view.context ?: return
                             val resId = XposedHelpers.callStaticMethod(bubbleUtils, "a", false, false) as Int
                             val drawable = ctx.getDrawable(resId) ?: return
-                            XposedHelpers.setObjectField(param.thisObject, "at", drawable)
+                            XposedHelpers.setObjectField(param.thisObject, drawableField, drawable)
                         } catch (e: Throwable) {
                             Log.w(TAG, "$desc failed: ${e.message}")
                         }
                     }
                 })
-            Log.i(TAG, "✔ $className.$methodName() [at] hook 完成")
+            Log.i(TAG, "✔ $className.$methodName() [$drawableField] hook 完成")
         } catch (e: Throwable) {
             Log.w(TAG, "$className.$methodName() hook 失败: ${e.message}")
         }
