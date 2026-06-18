@@ -30,17 +30,13 @@ class DarkModeFixHook : BaseHook(HookFeature.DARK_MODE) {
         }
 
         // 1. gwf (ChatToTextMessageViewHolder) — 文本消息
-        //    字段 "ab" (LinearLayout) 来自父类 gwe
         hookViewHolder(cl, "taurus.gwf", "P", "ab", leftBgNormalId, "文本常态")
         hookViewHolder(cl, "taurus.gwf", "M", "ab", leftBgPressedId, "文本按压")
 
         // 2. awj (BaseReplyMsgViewHolder) — 回复消息
-        //    字段 "o" (View)
         hookViewHolder(cl, "taurus.awj", "M", "o", leftBgNormalId, "回复消息")
 
         // 3. bez (UserVoiceToViewHolder) — 语音消息
-        //    字段 "ab" (View) 来自父类 bfa
-        //    方法名是 K() 和 L()，不是 P() 和 M()
         hookViewHolder(cl, "taurus.bez", "K", "ab", leftBgPressedId, "语音按压")
         hookViewHolder(cl, "taurus.bez", "L", "ab", leftBgNormalId, "语音常态")
 
@@ -76,6 +72,9 @@ class DarkModeFixHook : BaseHook(HookFeature.DARK_MODE) {
                             val view = XposedHelpers.getObjectField(param.thisObject, fieldName) as? View
                             if (view != null) {
                                 view.setBackgroundResource(resId)
+                                Log.d(TAG, "$desc: setResource(0x${Integer.toHexString(resId)})")
+                            } else {
+                                Log.w(TAG, "$desc: view field '$fieldName' is null")
                             }
                         } catch (e: Throwable) {
                             Log.w(TAG, "$desc failed: ${e.message}")
