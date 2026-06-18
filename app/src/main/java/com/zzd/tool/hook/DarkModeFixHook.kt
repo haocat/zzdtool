@@ -40,8 +40,9 @@ class DarkModeFixHook : BaseHook(HookFeature.DARK_MODE) {
 
         // 3. bez (UserVoiceToViewHolder) — 语音消息
         //    字段 "ab" (View) 来自父类 bfa
-        hookViewHolder(cl, "taurus.bez", "P", "ab", leftBgNormalId, "语音常态")
-        hookViewHolder(cl, "taurus.bez", "M", "ab", leftBgPressedId, "语音按压")
+        //    方法名是 K() 和 L()，不是 P() 和 M()
+        hookViewHolder(cl, "taurus.bez", "K", "ab", leftBgPressedId, "语音按压")
+        hookViewHolder(cl, "taurus.bez", "L", "ab", leftBgNormalId, "语音常态")
 
         // 4. awv.a() — ChatBubbleUtils 兜底
         try {
